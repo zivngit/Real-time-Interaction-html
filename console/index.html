@@ -11,10 +11,11 @@
     width: 44px; height: 44px; border-radius: 50%;
     background: #2d4a66; border: 1px solid #6ea3d8;
     box-shadow: 0 4px 16px rgba(0,0,0,0.45);
-    cursor: pointer; display: flex; align-items: center; justify-content: center;
-    padding: 0;
+    cursor: grab; display: flex; align-items: center; justify-content: center;
+    padding: 0; touch-action: none;
   }
   #fab:hover { background: #35597a; }
+  #fab.dragging { cursor: grabbing; }
   #fab svg { width: 20px; height: 20px; stroke: #fff; stroke-width: 2; stroke-linecap: round; fill: none; }
   #fab .icon-close { display: none; }
   #fab.active .icon-open { display: none; }
@@ -82,7 +83,7 @@
     <label>金鑰</label>
     <input type="password" id="srvKey" placeholder="（可留空）">
   </div>
-  <div id="hint">選取特效後，點擊畫面任意位置發送。點擊左上角圓形按鈕可收合/展開面板。狀態僅記錄於 console。</div>
+  <div id="hint">選取特效後，點擊畫面任意位置發送。點擊圓形按鈕可收合/展開面板，長按圓形按鈕可拖曳移動位置。狀態僅記錄於 console。</div>
 </div>
 <script src="app.js"></script>
 </body>

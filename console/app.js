@@ -21,11 +21,78 @@
 
   var fab = document.getElementById("fab");
   var panel = document.getElementById("panel");
+  var suppressClick = false;
   fab.addEventListener("click", function () {
+    if (suppressClick) return;
     var open = panel.classList.toggle("open");
     fab.classList.toggle("active", open);
     fab.setAttribute("aria-expanded", open ? "true" : "false");
   });
+
+  // 長按 #fab 拖曳移動（panel 跟隨，限制於視窗內）；短按仍為展開/收合
+  var LONG_PRESS_MS = cfg.longPressMs || 350;
+  var DRAG_SLOP_PX = 8;
+  var FAB_SIZE = 44;
+  var FAB_GAP = 54;
+  var fabPos = { x: 12, y: 12 };
+  var drag = null;
+
+  function applyFabPos() {
+    fabPos.x = Math.max(0, Math.min(fabPos.x, window.innerWidth - FAB_SIZE));
+    fabPos.y = Math.max(0, Math.min(fabPos.y, window.innerHeight - FAB_SIZE));
+    fab.style.left = fabPos.x + "px";
+    fab.style.top = fabPos.y + "px";
+    var ph = panel.offsetHeight || 0;
+    var pTop = fabPos.y + FAB_GAP;
+    if (pTop + ph > window.innerHeight - 8) pTop = fabPos.y - ph - 10;
+    panel.style.left = fabPos.x + "px";
+    panel.style.top = Math.max(8, pTop) + "px";
+  }
+
+  fab.addEventListener("pointerdown", function (e) {
+    if (e.button !== undefined && e.button !== 0) return;
+    e.preventDefault();
+    drag = {
+      startX: e.clientX, startY: e.clientY,
+      originX: fabPos.x, originY: fabPos.y,
+      active: false,
+      timer: setTimeout(function () {
+        drag.active = true;
+        fab.classList.add("dragging");
+      }, LONG_PRESS_MS),
+    };
+    if (fab.setPointerCapture) fab.setPointerCapture(e.pointerId);
+  });
+
+  window.addEventListener("pointermove", function (e) {
+    if (!drag) return;
+    if (!drag.active) {
+      if (Math.abs(e.clientX - drag.startX) > DRAG_SLOP_PX ||
+          Math.abs(e.clientY - drag.startY) > DRAG_SLOP_PX) {
+        clearTimeout(drag.timer);
+        drag = null;
+      }
+      return;
+    }
+    fabPos.x = drag.originX + (e.clientX - drag.startX);
+    fabPos.y = drag.originY + (e.clientY - drag.startY);
+    applyFabPos();
+    e.preventDefault();
+  });
+
+  window.addEventListener("pointerup", function () {
+    if (!drag) return;
+    clearTimeout(drag.timer);
+    var wasDrag = drag.active;
+    drag = null;
+    fab.classList.remove("dragging");
+    if (wasDrag) {
+      suppressClick = true;
+      setTimeout(function () { suppressClick = false; }, 0);
+    }
+  });
+
+  window.addEventListener("resize", applyFabPos);
 
   var selected = "particle";
   var buttons = document.querySelectorAll("#fxButtons .fx");

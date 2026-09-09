@@ -8,12 +8,16 @@ import vm from "node:vm";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const src = readFileSync(join(root, "console", "app.js"), "utf8");
 
-function makeEnv() {
+function makeEnv(opts) {
   const els = new Map();
   const fetchCalls = [];
 
   function makeEl(id) {
-    const el = { id, value: "", _listeners: {}, _classes: new Set(), _attrs: {}, _parent: null };
+    const el = {
+      id, value: "", _listeners: {}, _classes: new Set(), _attrs: {}, _parent: null,
+      style: {}, offsetHeight: 0,
+      setPointerCapture() {}, releasePointerCapture() {},
+    };
     el.classList = {
       add: (c) => el._classes.add(c),
       remove: (c) => el._classes.delete(c),
@@ -51,7 +55,7 @@ function makeEnv() {
   const windowListeners = {};
   const sandbox = {
     window: {
-      CONTROL_CONFIG: {},
+      CONTROL_CONFIG: opts || {},
       innerWidth: 1000,
       innerHeight: 500,
       addEventListener: (t, fn) => { (windowListeners[t] ??= []).push(fn); },
@@ -69,6 +73,8 @@ function makeEnv() {
       return { ok: true, status: 200, text: async () => "" };
     },
     console: { info() {}, error() {} },
+    setTimeout: setTimeout,
+    clearTimeout: clearTimeout,
   };
   vm.createContext(sandbox);
   el("fab")._attrs["aria-expanded"] = "false";
@@ -148,4 +154,58 @@ test("fx selection changes sent effect", () => {
   assert.equal(env.fetchCalls.length, 2);
   assert.equal(JSON.parse(env.fetchCalls[1].opts.body).effect, "text");
   assert.deepEqual(JSON.parse(env.fetchCalls[1].opts.body).params, { content: "Hi", color: "" });
+});
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const pdown = { button: 0, pointerId: 1, preventDefault() {} };
+
+test("long-press then drag moves fab and panel follows", async () => {
+  const env = makeEnv({ longPressMs: 20 });
+  const fab = env.el("fab");
+  const panel = env.el("panel");
+  fab._fire("pointerdown", { clientX: 34, clientY: 34, ...pdown });
+  await sleep(30);
+  env.fireWindow("pointermove", { clientX: 134, clientY: 114, preventDefault() {} });
+  assert.equal(fab.style.left, "112px");
+  assert.equal(fab.style.top, "92px");
+  assert.equal(panel.style.left, "112px");
+  assert.equal(panel.style.top, "146px");
+  env.fireWindow("pointerup", {});
+  fab._fire("click");
+  assert.equal(panel._classes.has("open"), false, "click after drag must not toggle");
+});
+
+test("quick click (no long-press) still toggles", async () => {
+  const env = makeEnv();
+  const fab = env.el("fab");
+  fab._fire("pointerdown", { clientX: 20, clientY: 20, ...pdown });
+  env.fireWindow("pointerup", {});
+  fab._fire("click");
+  assert.equal(env.el("panel")._classes.has("open"), true);
+});
+
+test("movement before long-press cancels drag (slop)", async () => {
+  const env = makeEnv({ longPressMs: 50 });
+  const fab = env.el("fab");
+  fab._fire("pointerdown", { clientX: 30, clientY: 30, ...pdown });
+  env.fireWindow("pointermove", { clientX: 50, clientY: 30, preventDefault() {} });
+  await sleep(60);
+  env.fireWindow("pointerup", {});
+  assert.equal(fab.style.left, undefined, "position must stay unchanged");
+  fab._fire("click");
+  assert.equal(env.el("panel")._classes.has("open"), true, "click must not be suppressed");
+});
+
+test("drag clamps fab inside viewport", async () => {
+  const env = makeEnv({ longPressMs: 20 });
+  const fab = env.el("fab");
+  const panel = env.el("panel");
+  fab._fire("pointerdown", { clientX: 34, clientY: 34, ...pdown });
+  await sleep(30);
+  env.fireWindow("pointermove", { clientX: 5000, clientY: 5000, preventDefault() {} });
+  assert.equal(fab.style.left, "956px", "clamped to innerWidth - 44");
+  assert.equal(fab.style.top, "456px", "clamped to innerHeight - 44");
+  assert.equal(panel.style.left, "956px", "panel follows horizontally");
+  assert.ok(parseFloat(panel.style.top) <= 492, "panel kept inside viewport");
+  env.fireWindow("pointerup", {});
 });
