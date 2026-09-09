@@ -37,7 +37,9 @@ project/
 ## 執行方式
 
 ```
-pip install -r c/requirements.txt
+python -m venv .venv                                  # 首次：建立虛擬環境
+.venv\Scripts\activate                                # Windows（Linux/macOS：source .venv/bin/activate）
+pip install -r c/requirements-dev.txt                 # 含測試依賴
 python -m uvicorn c.main:app --port 8000    # c 中繼（專案根目錄執行）
 ```
 
