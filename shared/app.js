@@ -14,7 +14,7 @@
   var key = cfg.key || (script ? script.getAttribute("data-key") : "") || "";
 
   function boot() {
-    console.info("[effects] v2 已載入（牆時計時＋背景 interval 備援）", (script && script.src) || "(inline)");
+    console.info("[effects] v3 已載入（牆時計時＋每幀清除重繪，無殘影）", (script && script.src) || "(inline)");
     if (typeof Effects === "undefined") {
       console.error("[effects] Effects (effects.js) 未載入");
       return;
@@ -43,14 +43,15 @@
 
     function tick() {
       var now = performance.now();
-      for (var i = active.length - 1; i >= 0; i--) {
-        var e = active[i];
+      var i, e;
+      for (i = active.length - 1; i >= 0; i--) {
+        e = active[i];
         Effects.stepEffect(e, now - e.born);
-        if (e.done()) {
-          active.splice(i, 1);
-        } else {
-          e.draw(ctx);
-        }
+        if (e.done()) active.splice(i, 1);
+      }
+      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      for (i = 0; i < active.length; i++) {
+        active[i].draw(ctx);
       }
       if (active.length) {
         if (timer == null) timer = setInterval(tick, 100);
@@ -61,12 +62,9 @@
             tick();
           });
         }
-      } else {
-        ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-        if (timer != null) {
-          clearInterval(timer);
-          timer = null;
-        }
+      } else if (timer != null) {
+        clearInterval(timer);
+        timer = null;
       }
     }
 
