@@ -14,6 +14,7 @@
   var key = cfg.key || (script ? script.getAttribute("data-key") : "") || "";
 
   function boot() {
+    console.info("[effects] v2 已載入（牆時計時＋背景 interval 備援）", (script && script.src) || "(inline)");
     if (typeof Effects === "undefined") {
       console.error("[effects] Effects (effects.js) 未載入");
       return;

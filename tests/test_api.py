@@ -93,6 +93,7 @@ def test_serves_app_js(client):
     r = client.get("/app.js")
     assert r.status_code == 200
     assert "javascript" in r.headers["content-type"]
+    assert r.headers["cache-control"] == "no-store"
     assert "EventSource" in r.text
 
 
@@ -100,6 +101,7 @@ def test_serves_effects_js(client):
     r = client.get("/effects.js")
     assert r.status_code == 200
     assert "javascript" in r.headers["content-type"]
+    assert r.headers["cache-control"] == "no-store"
     assert "createEffect" in r.text
 
 

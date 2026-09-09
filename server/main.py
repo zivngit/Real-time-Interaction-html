@@ -160,15 +160,18 @@ async def stream(
     )
 
 
+NO_STORE = {"Cache-Control": "no-store"}
+
+
 @app.get("/app.js")
 async def app_js():
     if not SHARED_APP_JS.exists():
         raise HTTPException(status_code=404, detail="shared/app.js not found")
-    return FileResponse(SHARED_APP_JS, media_type="application/javascript")
+    return FileResponse(SHARED_APP_JS, media_type="application/javascript", headers=NO_STORE)
 
 
 @app.get("/effects.js")
 async def effects_js():
     if not SHARED_EFFECTS_JS.exists():
         raise HTTPException(status_code=404, detail="shared/effects.js not found")
-    return FileResponse(SHARED_EFFECTS_JS, media_type="application/javascript")
+    return FileResponse(SHARED_EFFECTS_JS, media_type="application/javascript", headers=NO_STORE)

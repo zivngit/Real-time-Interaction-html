@@ -24,6 +24,7 @@
 ## 第二階段：測試、效能與發布
 
 - [x] 瀏覽器端手動驗收（2026-09-09 完成，結果見 docs/temp/MANUAL_TEST.md；發現之 L30 背景特效凍結、L34 斷線 log 刷屏已修復）
+- [x] 修復後續（2026-09-09）：用戶複測仍見舊版行為——舊分頁記憶體中仍是舊 JS；已為 `/app.js`、`/effects.js` 加 `Cache-Control: no-store`、app.js 啟動 log 版本標記 v2，複測須開新分頁並於 F12 確認 v2 log
 - [ ] server 斷線重播暫存（最近 N 則）
 - [ ] viewer 狀態回報（POST /api/status）
 - [ ] 多 viewer 負載／效能測試
