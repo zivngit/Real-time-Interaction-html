@@ -29,8 +29,7 @@
     fab.setAttribute("aria-expanded", open ? "true" : "false");
   });
 
-  // 長按 #fab 拖曳移動（panel 跟隨，限制於視窗內）；短按仍為展開/收合
-  var LONG_PRESS_MS = cfg.longPressMs || 350;
+  // 按住 #fab 拖曳移動（位移 >8px 即啟動，無等待；panel 跟隨，fab/panel 皆限制於視窗內）；短按仍為展開/收合
   var DRAG_SLOP_PX = 8;
   var FAB_SIZE = 44;
   var FAB_GAP = 54;
@@ -42,11 +41,14 @@
     fabPos.y = Math.max(0, Math.min(fabPos.y, window.innerHeight - FAB_SIZE));
     fab.style.left = fabPos.x + "px";
     fab.style.top = fabPos.y + "px";
+    var pw = panel.offsetWidth || 0;
     var ph = panel.offsetHeight || 0;
+    var pLeft = Math.max(8, Math.min(fabPos.x, window.innerWidth - pw - 8));
     var pTop = fabPos.y + FAB_GAP;
     if (pTop + ph > window.innerHeight - 8) pTop = fabPos.y - ph - 10;
-    panel.style.left = fabPos.x + "px";
-    panel.style.top = Math.max(8, pTop) + "px";
+    pTop = Math.max(8, Math.min(pTop, window.innerHeight - ph - 8));
+    panel.style.left = pLeft + "px";
+    panel.style.top = pTop + "px";
   }
 
   fab.addEventListener("pointerdown", function (e) {
@@ -56,10 +58,6 @@
       startX: e.clientX, startY: e.clientY,
       originX: fabPos.x, originY: fabPos.y,
       active: false,
-      timer: setTimeout(function () {
-        drag.active = true;
-        fab.classList.add("dragging");
-      }, LONG_PRESS_MS),
     };
     if (fab.setPointerCapture) fab.setPointerCapture(e.pointerId);
   });
@@ -67,12 +65,10 @@
   window.addEventListener("pointermove", function (e) {
     if (!drag) return;
     if (!drag.active) {
-      if (Math.abs(e.clientX - drag.startX) > DRAG_SLOP_PX ||
-          Math.abs(e.clientY - drag.startY) > DRAG_SLOP_PX) {
-        clearTimeout(drag.timer);
-        drag = null;
-      }
-      return;
+      if (Math.abs(e.clientX - drag.startX) <= DRAG_SLOP_PX &&
+          Math.abs(e.clientY - drag.startY) <= DRAG_SLOP_PX) return;
+      drag.active = true;
+      fab.classList.add("dragging");
     }
     fabPos.x = drag.originX + (e.clientX - drag.startX);
     fabPos.y = drag.originY + (e.clientY - drag.startY);
@@ -82,7 +78,6 @@
 
   window.addEventListener("pointerup", function () {
     if (!drag) return;
-    clearTimeout(drag.timer);
     var wasDrag = drag.active;
     drag = null;
     fab.classList.remove("dragging");
