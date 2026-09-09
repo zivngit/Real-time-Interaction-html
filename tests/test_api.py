@@ -8,7 +8,7 @@ import pytest
 import uvicorn
 from fastapi.testclient import TestClient
 
-import c.main as m
+import server.main as m
 
 
 def _free_port() -> int:
@@ -23,15 +23,15 @@ def _free_port() -> int:
 def client(monkeypatch):
     monkeypatch.setattr(m, "ACCESS_KEY", "")
     m._rate_window.clear()
-    with TestClient(m.app) as c:
-        yield c
+    with TestClient(m.app) as tc:
+        yield tc
 
 
 @pytest.fixture()
 def live_server():
     m._rate_window.clear()
     port = _free_port()
-    config = uvicorn.Config("c.main:app", host="127.0.0.1", port=port, log_level="warning")
+    config = uvicorn.Config("server.main:app", host="127.0.0.1", port=port, log_level="warning")
     server = uvicorn.Server(config)
     t = threading.Thread(target=server.run, daemon=True)
     t.start()

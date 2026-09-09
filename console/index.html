@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>a — 控制端</title>
+<title>console — 控制端</title>
 <style>
   html, body { margin: 0; height: 100%; background: #101418; overflow: hidden; font-family: system-ui, sans-serif; }
   #panel {
@@ -38,7 +38,7 @@
 </head>
 <body>
 <div id="panel">
-  <h1>控制端 (a)</h1>
+  <h1>控制端 (console)</h1>
   <div class="row" id="fxButtons">
     <button class="fx selected" data-fx="particle">粒子爆散</button>
     <button class="fx" data-fx="ripple">漣漪圈</button>
@@ -55,12 +55,12 @@
     <button id="clearBtn">清屏</button>
   </div>
   <div class="field">
-    <label>中繼 c</label>
-    <input type="url" id="cUrl" placeholder="http://localhost:8000">
+    <label>中繼 server</label>
+    <input type="url" id="srvUrl" placeholder="http://localhost:8000">
   </div>
   <div class="field">
     <label>金鑰</label>
-    <input type="password" id="cKey" placeholder="（可留空）">
+    <input type="password" id="srvKey" placeholder="（可留空）">
   </div>
   <div id="hint">選取特效後，點擊畫面任意位置發送。狀態僅記錄於 console。</div>
 </div>

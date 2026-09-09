@@ -2,19 +2,19 @@
   "use strict";
 
   var cfg = window.CONTROL_CONFIG || {};
-  var cUrl = localStorage.getItem("rtx.cUrl") || cfg.url || "http://localhost:8000";
-  var cKey = localStorage.getItem("rtx.cKey") || cfg.key || "";
+  var srvUrl = localStorage.getItem("rtx.srvUrl") || cfg.url || "http://localhost:8000";
+  var srvKey = localStorage.getItem("rtx.srvKey") || cfg.key || "";
 
-  var elUrl = document.getElementById("cUrl");
-  var elKey = document.getElementById("cKey");
-  elUrl.value = cUrl;
-  elKey.value = cKey;
+  var elUrl = document.getElementById("srvUrl");
+  var elKey = document.getElementById("srvKey");
+  elUrl.value = srvUrl;
+  elKey.value = srvKey;
 
   function saveCfg() {
-    cUrl = elUrl.value.trim().replace(/\/+$/, "");
-    cKey = elKey.value.trim();
-    localStorage.setItem("rtx.cUrl", cUrl);
-    localStorage.setItem("rtx.cKey", cKey);
+    srvUrl = elUrl.value.trim().replace(/\/+$/, "");
+    srvKey = elKey.value.trim();
+    localStorage.setItem("rtx.srvUrl", srvUrl);
+    localStorage.setItem("rtx.srvKey", srvKey);
   }
   elUrl.addEventListener("change", saveCfg);
   elKey.addEventListener("change", saveCfg);
@@ -23,7 +23,7 @@
   var buttons = document.querySelectorAll("#fxButtons .fx");
   buttons.forEach(function (btn) {
     btn.addEventListener("click", function () {
-      buttons.forEach(function (b) { b.classList.remove("selected"); });
+      buttons.forEach(function (el) { el.classList.remove("selected"); });
       btn.classList.add("selected");
       selected = btn.getAttribute("data-fx");
     });
@@ -31,7 +31,7 @@
 
   function headers() {
     var h = { "Content-Type": "application/json" };
-    if (cKey) h["X-Access-Key"] = cKey;
+    if (srvKey) h["X-Access-Key"] = srvKey;
     return h;
   }
 
@@ -54,7 +54,7 @@
 
   async function post(path, body) {
     try {
-      var r = await fetch(cUrl + path, {
+      var r = await fetch(srvUrl + path, {
         method: "POST",
         headers: headers(),
         body: JSON.stringify(body || {}),

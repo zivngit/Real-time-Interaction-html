@@ -39,14 +39,14 @@ project/
 ```
 python -m venv .venv                                  # 首次：建立虛擬環境
 .venv\Scripts\activate                                # Windows（Linux/macOS：source .venv/bin/activate）
-pip install -r c/requirements-dev.txt                 # 含測試依賴
-python -m uvicorn c.main:app --port 8000    # c 中繼（專案根目錄執行）
+pip install -r server/requirements-dev.txt            # 含測試依賴
+python -m uvicorn server.main:app --port 8000   # server 中繼（專案根目錄執行）
 ```
 
-- a 控制端：瀏覽器開啟 `a/index.html`
-- b 顯示端：瀏覽器開啟 `b/index.html`（獨立預覽）
-- 嵌入其他網頁：`<script src="http://<c-host>:8000/app.js"></script>`
-- 存取金鑰（可選）：設定環境變數 `ACCESS_KEY`；a 於面板填入、嵌入用 `data-key="..."`
+- console 控制端：瀏覽器開啟 `console/index.html`
+- viewer 顯示端：瀏覽器開啟 `viewer/index.html`（獨立預覽）
+- 嵌入其他網頁：`<script src="http://<server-host>:8000/app.js"></script>`
+- 存取金鑰（可選）：設定環境變數 `ACCESS_KEY`；console 於面板填入、嵌入用 `data-key="..."`
 
 測試：
 
