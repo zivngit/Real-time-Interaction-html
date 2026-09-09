@@ -34,6 +34,25 @@ project/
 | 3. Document | 同步更新架構圖與任務狀態 | `CALL_GRAPH.md`、`TODO.md` |
 | 4. Commit & Report | 產生 Git commit 與工作完成報告 | Git、`reports/` |
 
+## 執行方式
+
+```
+pip install -r c/requirements.txt
+python -m uvicorn c.main:app --port 8000    # c 中繼（專案根目錄執行）
+```
+
+- a 控制端：瀏覽器開啟 `a/index.html`
+- b 顯示端：瀏覽器開啟 `b/index.html`（獨立預覽）
+- 嵌入其他網頁：`<script src="http://<c-host>:8000/app.js"></script>`
+- 存取金鑰（可選）：設定環境變數 `ACCESS_KEY`；a 於面板填入、嵌入用 `data-key="..."`
+
+測試：
+
+```
+python -m pytest tests/ -v
+node --test tests/test_effects.mjs
+```
+
 ## 文件維護原則
 
 - 每次改動都需對應一個具描述性的 Git commit。

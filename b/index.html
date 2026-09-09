@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>b — 顯示端預覽</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #05070a; overflow: hidden; }
+  #label {
+    position: fixed; left: 10px; bottom: 8px; z-index: 1;
+    font: 11px system-ui, sans-serif; color: #3d4c5c; pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div id="label">b 顯示端預覽 — 嵌入其他網頁時使用：&lt;script src="http://&lt;c-host&gt;:8000/app.js"&gt;</div>
+<script src="../shared/effects.js"></script>
+<script src="../shared/app.js"></script>
+</body>
+</html>
