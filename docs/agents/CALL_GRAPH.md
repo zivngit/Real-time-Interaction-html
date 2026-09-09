@@ -7,7 +7,7 @@
 | `server/main.py` | 中繼後端（FastAPI）：驗證、限頻、SSE 廣播、提供 `/app.js`、`/effects.js`（附 `Cache-Control: no-store`，避免瀏覽器快取舊版腳本） |
 | `shared/effects.js` | 特效定義與動畫計算（particle/ripple/firework/text）、座標換算、`stepEffect` 牆時推進（substep ≤50ms）；browser/node 雙用（UMD） |
 | `shared/app.js` | 顯示端嵌入腳本：canvas 疊層（pointer-events: none）、SSE 訂閱（狀態切換才 log）、rAF＋setInterval 雙驅動渲染迴圈（特效以 born/elapsed 牆時計時，背景分頁不凍結；**每 tick 先移除完成特效 → clearRect → 重繪全部 active**，canvas 為當下狀態純函數，無殘影/像素累積）、啟動 log 版本標記 v3（可於 F12 確認載入版本） |
-| `console/index.html`＋`console/app.js` | 控制端：特效選擇、參數設定、點擊座標 → POST server |
+| `console/index.html`＋`console/app.js` | 控制端：懸浮按鈕 `#fab` 展開/收合面板（預設收合，`#panel.open` 顯示）、特效選擇、參數設定、點擊座標 → POST server（點擊 `#fab`/`#panel` 不觸發發送） |
 | `viewer/index.html` | 顯示端獨立預覽頁（引用 shared/effects.js＋shared/app.js） |
 
 ## 1. 啟動與 server 端路由
@@ -31,7 +31,10 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A1[window click] --> A2[console/app.js post /api/effect]
+    A0[#fab click] --> A0a[panel.classList.toggle("open")＋fab active/aria-expanded]
+    A1[window click] --> A1a{target closest #panel/#fab?}
+    A1a -- 是 --> A1b[ignore（不發送）]
+    A1a -- 否 --> A2[console/app.js post /api/effect]
     A3[清屏按鈕] --> A4[console/app.js post /api/clear]
     S1[SSE event: effect] --> B1[shared/app.js handleEffect：born/elapsed 初始化]
     B1 --> B2[Effects.toPixels → Effects.createEffect]

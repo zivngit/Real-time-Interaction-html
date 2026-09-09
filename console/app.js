@@ -19,6 +19,14 @@
   elUrl.addEventListener("change", saveCfg);
   elKey.addEventListener("change", saveCfg);
 
+  var fab = document.getElementById("fab");
+  var panel = document.getElementById("panel");
+  fab.addEventListener("click", function () {
+    var open = panel.classList.toggle("open");
+    fab.classList.toggle("active", open);
+    fab.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+
   var selected = "particle";
   var buttons = document.querySelectorAll("#fxButtons .fx");
   buttons.forEach(function (btn) {
@@ -78,7 +86,7 @@
   });
 
   window.addEventListener("click", function (e) {
-    if (e.target.closest("#panel")) return;
+    if (e.target.closest("#panel") || e.target.closest("#fab")) return;
     var x = (e.clientX / window.innerWidth) * 100;
     var y = (e.clientY / window.innerHeight) * 100;
     post("/api/effect", {
