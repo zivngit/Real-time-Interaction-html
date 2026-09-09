@@ -5,8 +5,8 @@
 | 模組 | 主要責任 |
 | --- | --- |
 | `server/main.py` | 中繼後端（FastAPI）：驗證、限頻、SSE 廣播、提供 `/app.js`、`/effects.js` |
-| `shared/effects.js` | 特效定義與動畫計算（particle/ripple/firework/text）、座標換算；browser/node 雙用（UMD） |
-| `shared/app.js` | 顯示端嵌入腳本：canvas 疊層（pointer-events: none）、SSE 訂閱、rAF 渲染迴圈 |
+| `shared/effects.js` | 特效定義與動畫計算（particle/ripple/firework/text）、座標換算、`stepEffect` 牆時推進（substep ≤50ms）；browser/node 雙用（UMD） |
+| `shared/app.js` | 顯示端嵌入腳本：canvas 疊層（pointer-events: none）、SSE 訂閱（狀態切換才 log）、rAF＋setInterval 雙驅動渲染迴圈（特效以 born/elapsed 牆時計時，背景分頁不凍結） |
 | `console/index.html`＋`console/app.js` | 控制端：特效選擇、參數設定、點擊座標 → POST server |
 | `viewer/index.html` | 顯示端獨立預覽頁（引用 shared/effects.js＋shared/app.js） |
 
@@ -33,11 +33,14 @@ flowchart TD
 flowchart TD
     A1[window click] --> A2[console/app.js post /api/effect]
     A3[清屏按鈕] --> A4[console/app.js post /api/clear]
-    S1[SSE event: effect] --> B1[shared/app.js handleEffect]
+    S1[SSE event: effect] --> B1[shared/app.js handleEffect：born/elapsed 初始化]
     B1 --> B2[Effects.toPixels → Effects.createEffect]
-    B2 --> B3[rAF tick：update / draw canvas]
+    B2 --> B3[spawn → tick：Effects.stepEffect 牆時推進 → draw canvas]
+    B3 -. "rAF 前台平滑" .-> B3
+    B3 -. "setInterval 100ms 背景補幀" .-> B3
     S2[SSE event: clear] --> B4[clearAll]
-    S3[SSE event: ping] --> B5[lastPing 更新（離線偵測 log）]
+    S3[SSE event: ping] --> B5[lastPing 更新（離線偵測，逾時 log 一次）]
+    S4[SSE open/error] --> B6[連線狀態切換 log（open→已連線、error→斷線重連中）]
 ```
 
 ## 3. 主要呼叫路徑（server）

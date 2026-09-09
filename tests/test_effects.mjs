@@ -65,6 +65,38 @@ test("createEffect throws on unknown type", () => {
   assert.throws(() => createEffect("nope", 0, 0, {}), /unknown effect/);
 });
 
+test("stepEffect advances ripple to wall-clock target", () => {
+  const e = createEffect("ripple", 0, 0, { duration: 1000 });
+  Effects.stepEffect(e, 900);
+  assert.equal(e.elapsed, 900);
+  assert.equal(e.done(), false);
+  Effects.stepEffect(e, 1000);
+  assert.equal(e.elapsed, 1000);
+  assert.equal(e.done(), true);
+});
+
+test("stepEffect no-ops when target already reached", () => {
+  const e = createEffect("ripple", 0, 0, { duration: 1000 });
+  Effects.stepEffect(e, 500);
+  Effects.stepEffect(e, 500);
+  assert.equal(e.elapsed, 500);
+  assert.equal(e.done(), false);
+});
+
+test("stepEffect large catch-up jump (background tab simulation)", () => {
+  const e = createEffect("ripple", 0, 0, { duration: 1000 });
+  Effects.stepEffect(e, 16);
+  Effects.stepEffect(e, 5000);
+  assert.equal(e.elapsed, 5000);
+  assert.equal(e.done(), true);
+});
+
+test("stepEffect completes particle on wall clock (max ttl = duration)", () => {
+  const e = createEffect("particle", 100, 100, { count: 30, duration: 800 });
+  Effects.stepEffect(e, 800);
+  assert.equal(e.done(), true);
+});
+
 test("params merge over defaults (ripple color)", () => {
   const e = createEffect("ripple", 0, 0, { color: "#abc123" });
   assert.equal(e.done(), false);

@@ -37,15 +37,14 @@
     resize();
 
     var active = [];
-    var raf = null;
-    var last = 0;
+    var rafPending = false;
+    var timer = null;
 
-    function tick(now) {
-      var dt = Math.min(50, now - last);
-      last = now;
+    function tick() {
+      var now = performance.now();
       for (var i = active.length - 1; i >= 0; i--) {
         var e = active[i];
-        e.update(dt);
+        Effects.stepEffect(e, now - e.born);
         if (e.done()) {
           active.splice(i, 1);
         } else {
@@ -53,18 +52,25 @@
         }
       }
       if (active.length) {
-        raf = requestAnimationFrame(tick);
+        if (timer == null) timer = setInterval(tick, 100);
+        if (!rafPending) {
+          rafPending = true;
+          requestAnimationFrame(function () {
+            rafPending = false;
+            tick();
+          });
+        }
       } else {
         ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-        raf = null;
+        if (timer != null) {
+          clearInterval(timer);
+          timer = null;
+        }
       }
     }
 
     function spawn() {
-      if (!raf) {
-        last = performance.now();
-        raf = requestAnimationFrame(tick);
-      }
+      if (timer == null && !rafPending) tick();
     }
 
     function clearAll() {
@@ -77,6 +83,8 @@
       try {
         var pt = Effects.toPixels(msg.x, msg.y, window.innerWidth, window.innerHeight);
         var fx = Effects.createEffect(msg.effect, pt.px, pt.py, msg.params || {});
+        fx.born = performance.now();
+        fx.elapsed = 0;
         active.push(fx);
         spawn();
       } catch (err) {
@@ -87,9 +95,15 @@
     var esUrl = base + "/api/stream" + (key ? "?key=" + encodeURIComponent(key) : "");
     var es = new EventSource(esUrl);
     var lastPing = Date.now();
+    var connected = false;
+    var pingWarned = false;
 
     es.addEventListener("open", function () {
-      console.info("[effects] 已連線", base);
+      if (!connected) {
+        connected = true;
+        pingWarned = false;
+        console.info("[effects] 已連線", base);
+      }
     });
     es.addEventListener("effect", function (ev) {
       handleEffect(JSON.parse(ev.data));
@@ -99,12 +113,20 @@
     });
     es.addEventListener("ping", function () {
       lastPing = Date.now();
+      pingWarned = false;
     });
     es.addEventListener("error", function () {
-      console.warn("[effects] 串流斷線，重連中…");
+      if (!connected) return;
+      connected = false;
+      if (es.readyState === EventSource.CLOSED) {
+        console.warn("[effects] 串流已關閉");
+      } else {
+        console.warn("[effects] 串流斷線，重連中…");
+      }
     });
     setInterval(function () {
-      if (Date.now() - lastPing > 45000) {
+      if (!pingWarned && Date.now() - lastPing > 45000) {
+        pingWarned = true;
         console.warn("[effects] 45 秒未收到 ping，可能離線");
       }
     }, 5000);

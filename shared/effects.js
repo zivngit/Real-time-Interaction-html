@@ -165,6 +165,18 @@
     };
   }
 
+  function stepEffect(effect, targetElapsed, maxStep) {
+    maxStep = maxStep || 50;
+    if (effect.elapsed == null) effect.elapsed = 0;
+    var adv = targetElapsed - effect.elapsed;
+    while (adv > 0) {
+      var s = Math.min(maxStep, adv);
+      effect.update(s);
+      effect.elapsed += s;
+      adv -= s;
+    }
+  }
+
   function createEffect(type, px, py, params) {
     params = params || {};
     switch (type) {
@@ -206,6 +218,7 @@
   return {
     EFFECTS: EFFECTS,
     createEffect: createEffect,
+    stepEffect: stepEffect,
     toPixels: toPixels,
     toPercent: toPercent,
     clamp: clamp,

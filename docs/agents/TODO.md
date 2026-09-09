@@ -23,7 +23,7 @@
 
 ## 第二階段：測試、效能與發布
 
-- [ ] 瀏覽器端手動驗收（console 發送 → viewer 渲染、嵌入宿主網頁不影響互動）
+- [x] 瀏覽器端手動驗收（2026-09-09 完成，結果見 docs/temp/MANUAL_TEST.md；發現之 L30 背景特效凍結、L34 斷線 log 刷屏已修復）
 - [ ] server 斷線重播暫存（最近 N 則）
 - [ ] viewer 狀態回報（POST /api/status）
 - [ ] 多 viewer 負載／效能測試
