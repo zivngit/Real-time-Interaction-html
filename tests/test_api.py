@@ -65,6 +65,70 @@ def test_effects_list(client):
     assert names == {"particle", "ripple", "firework", "text"}
 
 
+def test_effects_list_sanitized_metadata(client):
+    r = client.get("/api/effects")
+    assert r.status_code == 200
+    effects = r.json()["effects"]
+    particle = effects["particle"]
+    assert particle["label"] == "粒子爆散"
+    assert particle["category"] == "burst"
+    assert particle["icon"] == "particle"
+    assert particle["viewerUrl"] == "/effects/particle/viewer.js"
+    assert particle["consoleUrl"] == "/effects/particle/console.js"
+    count = particle["params"]["count"]
+    assert count == {"type": "integer", "label": "數量", "default": 40, "min": 1, "max": 400, "step": 1}
+    firework = effects["firework"]
+    assert firework["viewerUrl"] == "/effects/firework/viewer.js"
+    assert firework["consoleUrl"] is None
+    assert firework["params"]["colors"]["editable"] is False
+    assert "name" not in particle
+    assert "viewer" not in particle
+
+
+def test_serves_effects_manifest_json(client):
+    r = client.get("/effects/effects.json")
+    assert r.status_code == 200
+    assert "json" in r.headers["content-type"]
+    assert r.headers["cache-control"] == "no-store"
+    body = r.json()
+    assert body["version"] == 1
+    assert set(body["effects"].keys()) == {"particle", "ripple", "firework", "text"}
+
+
+def test_serves_effect_viewer_js(client):
+    for effect_id in ("particle", "ripple", "firework", "text"):
+        r = client.get(f"/effects/{effect_id}/viewer.js")
+        assert r.status_code == 200
+        assert "javascript" in r.headers["content-type"]
+        assert r.headers["cache-control"] == "no-store"
+        assert "register" in r.text
+
+
+def test_serves_effect_console_js_when_present(client):
+    for effect_id in ("particle", "ripple", "text"):
+        r = client.get(f"/effects/{effect_id}/console.js")
+        assert r.status_code == 200
+        assert "javascript" in r.headers["content-type"]
+        assert r.headers["cache-control"] == "no-store"
+        assert "RTX_EFFECT_CONSOLE" in r.text
+
+
+def test_missing_effect_console_js_is_404(client):
+    assert client.get("/effects/firework/console.js").status_code == 404
+
+
+def test_effect_asset_path_traversal_rejected(client):
+    for route in (
+        "/effects/..",
+        "/effects/..%2F..%2Fserver%2Fmain.py",
+        "/effects/..%2Fserver%2Fmain.py/viewer.js",
+        "/effects/particle/../viewer/app.js",
+        "/effects/particle%2Fviewer.js/viewer.js",
+        "/effects/particle/other.js",
+    ):
+        assert client.get(route).status_code == 404, route
+
+
 def test_effect_ok(client):
     r = client.post("/api/effect", json={"effect": "particle", "x": 50, "y": 50, "params": {"color": "#fff"}})
     assert r.status_code == 200
@@ -81,6 +145,129 @@ def test_effect_unknown(client):
 def test_effect_bad_coords(client):
     r = client.post("/api/effect", json={"effect": "particle", "x": 101, "y": 50})
     assert r.status_code == 422
+
+
+@pytest.fixture()
+def capture_broadcast(client, monkeypatch):
+    captured = []
+    monkeypatch.setattr(m, "_broadcast", lambda msg: captured.append(msg))
+    return captured
+
+
+def test_effect_params_fill_defaults(client, capture_broadcast):
+    r = client.post("/api/effect", json={"effect": "particle", "x": 50, "y": 50})
+    assert r.status_code == 200
+    assert capture_broadcast[0]["params"] == {
+        "color": "#ff0044",
+        "count": 40,
+        "spread": 360,
+        "speed": 0.35,
+        "duration": 1200,
+    }
+
+
+def test_effect_params_clamp_number(client, capture_broadcast):
+    r = client.post(
+        "/api/effect",
+        json={"effect": "particle", "x": 50, "y": 50, "params": {"spread": 999, "speed": 0.01}},
+    )
+    assert r.status_code == 200
+    p = capture_broadcast[0]["params"]
+    assert p["spread"] == 360
+    assert p["speed"] == 0.05
+
+
+def test_effect_params_integer_round_and_clamp(client, capture_broadcast):
+    r = client.post(
+        "/api/effect",
+        json={"effect": "particle", "x": 50, "y": 50, "params": {"count": 40.6, "duration": 5.5}},
+    )
+    assert r.status_code == 200
+    p = capture_broadcast[0]["params"]
+    assert p["count"] == 41
+    assert isinstance(p["count"], int)
+    assert p["duration"] == 200
+
+
+def test_effect_params_invalid_color_falls_back(client, capture_broadcast):
+    r = client.post(
+        "/api/effect",
+        json={"effect": "particle", "x": 50, "y": 50, "params": {"color": "not-a-color"}},
+    )
+    assert r.status_code == 200
+    assert capture_broadcast[0]["params"]["color"] == "#ff0044"
+    client.post(
+        "/api/effect",
+        json={"effect": "particle", "x": 50, "y": 50, "params": {"color": "#12345678"}},
+    )
+    assert capture_broadcast[1]["params"]["color"] == "#12345678"
+
+
+def test_effect_params_unknown_ignored(client, capture_broadcast):
+    r = client.post(
+        "/api/effect",
+        json={"effect": "particle", "x": 50, "y": 50, "params": {"bogus": 1, "count": 10}},
+    )
+    assert r.status_code == 200
+    p = capture_broadcast[0]["params"]
+    assert "bogus" not in p
+    assert p["count"] == 10
+
+
+def test_effect_params_editable_false_uses_default(client, capture_broadcast):
+    r = client.post(
+        "/api/effect",
+        json={"effect": "firework", "x": 50, "y": 50, "params": {"colors": ["#111111"], "count": 5}},
+    )
+    assert r.status_code == 200
+    p = capture_broadcast[0]["params"]
+    assert p["colors"] == ["#ff5252", "#ffd740", "#40c4ff", "#69f0ae"]
+    assert p["count"] == 5
+
+
+def test_effect_params_string_max_length_truncated(client, capture_broadcast):
+    r = client.post(
+        "/api/effect",
+        json={"effect": "text", "x": 50, "y": 50, "params": {"content": "a" * 30}},
+    )
+    assert r.status_code == 200
+    assert capture_broadcast[0]["params"]["content"] == "a" * 20
+
+
+def test_effect_params_non_string_falls_back(client, capture_broadcast):
+    r = client.post(
+        "/api/effect",
+        json={"effect": "text", "x": 50, "y": 50, "params": {"content": 123}},
+    )
+    assert r.status_code == 200
+    assert capture_broadcast[0]["params"]["content"] == "Hello"
+
+
+def test_effect_params_boolean_and_select_fallback(client, monkeypatch, capture_broadcast):
+    synthetic = dict(m.EFFECTS)
+    synthetic["synth"] = {
+        "label": "synth",
+        "viewerUrl": "/effects/synth/viewer.js",
+        "consoleUrl": None,
+        "params": {
+            "flag": {"type": "boolean", "label": "flag", "default": True},
+            "mode": {
+                "type": "select",
+                "label": "mode",
+                "default": "a",
+                "options": [{"value": "a", "label": "A"}, {"value": "b", "label": "B"}],
+            },
+        },
+    }
+    monkeypatch.setattr(m, "EFFECTS", synthetic)
+    assert client.post(
+        "/api/effect", json={"effect": "synth", "x": 50, "y": 50, "params": {"flag": "yes", "mode": "b"}}
+    ).status_code == 200
+    assert client.post(
+        "/api/effect", json={"effect": "synth", "x": 50, "y": 50, "params": {"flag": False, "mode": "nope"}}
+    ).status_code == 200
+    assert capture_broadcast[0]["params"] == {"flag": True, "mode": "b"}
+    assert capture_broadcast[1]["params"] == {"flag": False, "mode": "a"}
 
 
 def test_clear(client):
@@ -199,7 +386,13 @@ def test_sse_receives_effect_and_clear(live_server):
     assert ev[1]["effect"] == "particle"
     assert ev[1]["x"] == 42.5
     assert ev[1]["y"] == 63.0
-    assert ev[1]["params"] == {"color": "#ff0044"}
+    assert ev[1]["params"] == {
+        "color": "#ff0044",
+        "count": 40,
+        "spread": 360,
+        "speed": 0.35,
+        "duration": 1200,
+    }
     assert ev[1]["id"]
     time.sleep(1.0)
     assert len(m._subscribers) == 0

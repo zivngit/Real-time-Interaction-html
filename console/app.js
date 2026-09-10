@@ -234,34 +234,23 @@
 
   var FALLBACK_ICON = "<svg viewBox='0 0 24 24' aria-hidden='true'><circle cx='12' cy='12' r='9'/><circle cx='12' cy='12' r='3'/></svg>";
   var externalIcons = window.RTX_EFFECT_ICONS || {};
-  function iconFor(type) {
-    return externalIcons[type] || externalIcons.generic || FALLBACK_ICON;
+  function iconFor(type, meta) {
+    var m = meta || {};
+    return externalIcons[m.icon] || externalIcons[type] || externalIcons.generic || FALLBACK_ICON;
   }
 
-  var PARAM_DEFS = {
-    particle: [
-      { key: "color", label: "顏色", type: "color", def: "#ff0044" },
-      { key: "count", label: "數量", type: "number", def: 40, min: 1, max: 400, step: 1 },
-      { key: "spread", label: "散佈(度)", type: "number", def: 360, min: 0, max: 360, step: 5 },
-      { key: "speed", label: "速度", type: "number", def: 0.35, min: 0.05, max: 2, step: 0.05 },
-      { key: "duration", label: "持續(ms)", type: "number", def: 1200, min: 200, max: 8000, step: 100 },
-    ],
-    firework: [
-      { key: "count", label: "數量", type: "number", def: 90, min: 1, max: 400, step: 1 },
-      { key: "duration", label: "持續(ms)", type: "number", def: 1800, min: 200, max: 8000, step: 100 },
-    ],
-    ripple: [
-      { key: "color", label: "顏色", type: "color", def: "#44aaff" },
-      { key: "maxRadius", label: "最大半徑", type: "number", def: 200, min: 20, max: 600, step: 10 },
-      { key: "duration", label: "持續(ms)", type: "number", def: 1200, min: 200, max: 8000, step: 100 },
-    ],
-    text: [
-      { key: "content", label: "文字", type: "text", def: "Hello" },
-      { key: "color", label: "顏色", type: "color", def: "#ffffff" },
-      { key: "size", label: "字級", type: "number", def: 32, min: 8, max: 160, step: 2 },
-      { key: "duration", label: "持續(ms)", type: "number", def: 2000, min: 200, max: 10000, step: 100 },
-    ],
-  };
+  var consoleRegistry =
+    window.RTX_EFFECT_CONSOLE && typeof window.RTX_EFFECT_CONSOLE === "object"
+      ? window.RTX_EFFECT_CONSOLE
+      : { registry: {} };
+  if (!window.RTX_EFFECT_CONSOLE) window.RTX_EFFECT_CONSOLE = consoleRegistry;
+  consoleRegistry.registry = consoleRegistry.registry || {};
+  if (typeof consoleRegistry.register !== "function") {
+    consoleRegistry.register = function (type, plugin) {
+      if (!type || !plugin || typeof plugin !== "object") return;
+      consoleRegistry.registry[type] = plugin;
+    };
+  }
 
   var FALLBACK_EFFECTS = {
     particle: { name: "粒子爆散", params: { color: "#ff0044", count: 40, spread: 360, speed: 0.35, duration: 1200 } },
@@ -273,6 +262,16 @@
   var EFFECTS_META = FALLBACK_EFFECTS;
   var fxButtonEls = [];
   var selected = Object.keys(EFFECTS_META)[0];
+
+  function isSchema(params) {
+    if (!params || typeof params !== "object" || Array.isArray(params)) return false;
+    var keys = Object.keys(params);
+    if (!keys.length) return true;
+    return keys.every(function (key) {
+      var v = params[key];
+      return v && typeof v === "object" && !Array.isArray(v) && typeof v.type === "string";
+    });
+  }
 
   function genericFields(params) {
     var out = [];
@@ -291,30 +290,112 @@
     return out;
   }
 
+  function schemaFields(params) {
+    var out = [];
+    Object.keys(params || {}).forEach(function (key) {
+      var d = params[key];
+      if (!d || typeof d !== "object" || typeof d.type !== "string") return;
+      if (d.editable === false) return;
+      if (d.type === "array") return;
+      out.push({
+        key: key,
+        label: d.label || key,
+        type: d.type,
+        def: d.default,
+        min: d.min,
+        max: d.max,
+        step: d.step,
+        maxLength: d.maxLength,
+        options: d.options,
+      });
+    });
+    return out;
+  }
+
   function fieldDefs(type) {
-    if (PARAM_DEFS[type]) return PARAM_DEFS[type];
     var meta = EFFECTS_META[type] || {};
-    return genericFields(meta.params || {});
+    var params = meta.params || {};
+    return isSchema(params) ? schemaFields(params) : genericFields(params);
+  }
+
+  function consoleApi(type) {
+    var meta = EFFECTS_META[type] || {};
+    var defaults = {};
+    fieldDefs(type).forEach(function (d) {
+      defaults[d.key] = d.def;
+    });
+    return {
+      type: type,
+      params: meta.params || {},
+      defaults: defaults,
+      fields: fieldDefs(type),
+      getValue: function (key) {
+        var input = document.getElementById("rtx-p-" + key);
+        if (!input) return undefined;
+        return input.type === "checkbox" ? input.checked : input.value;
+      },
+      setValue: function (key, value) {
+        var input = document.getElementById("rtx-p-" + key);
+        if (!input) return;
+        if (input.type === "checkbox") input.checked = Boolean(value);
+        else input.value = value;
+      },
+    };
+  }
+
+  function renderField(d) {
+    var field = make("div", null, "rtx-field");
+    var label = make("label");
+    label.textContent = d.label;
+    var input;
+    if (d.type === "select") {
+      input = make("select", "rtx-p-" + d.key);
+      (d.options || []).forEach(function (opt) {
+        var o = make("option");
+        o.value = opt.value;
+        o.textContent = opt.label != null ? opt.label : String(opt.value);
+        input.appendChild(o);
+      });
+      input.value = d.def != null ? d.def : "";
+    } else {
+      input = make("input", "rtx-p-" + d.key);
+      if (d.type === "boolean") {
+        input.type = "checkbox";
+        input.checked = d.def === true;
+      } else {
+        input.type =
+          d.type === "integer" || d.type === "number"
+            ? "number"
+            : d.type === "color"
+              ? "color"
+              : "text";
+        input.value = d.def != null ? d.def : "";
+        if (d.type === "integer" || d.type === "number") {
+          if (d.min != null) input.min = d.min;
+          if (d.max != null) input.max = d.max;
+          if (d.step != null) input.step = d.step;
+        }
+        if (d.maxLength != null) input.maxLength = d.maxLength;
+      }
+    }
+    field.appendChild(label);
+    field.appendChild(input);
+    paramsBody.appendChild(field);
   }
 
   function renderParams() {
     paramsBody.innerHTML = "";
-    fieldDefs(selected).forEach(function (d) {
-      var field = make("div", null, "rtx-field");
-      var label = make("label");
-      label.textContent = d.label;
-      var input = make("input", "rtx-p-" + d.key);
-      input.type = d.type;
-      input.value = d.def;
-      if (d.type === "number") {
-        if (d.min != null) input.min = d.min;
-        if (d.max != null) input.max = d.max;
-        if (d.step != null) input.step = d.step;
+    var plugin = consoleRegistry.registry[selected];
+    if (plugin && typeof plugin.render === "function") {
+      try {
+        plugin.render(paramsBody, consoleApi(selected));
+        return;
+      } catch (err) {
+        console.warn("[control] console 插件 render 失敗，改用 schema 渲染", err);
+        paramsBody.innerHTML = "";
       }
-      field.appendChild(label);
-      field.appendChild(input);
-      paramsBody.appendChild(field);
-    });
+    }
+    fieldDefs(selected).forEach(renderField);
   }
 
   function selectEffect(type) {
@@ -335,11 +416,12 @@
     Object.keys(EFFECTS_META).forEach(function (type) {
       var e = EFFECTS_META[type] || {};
       var name = e.name || type;
-      var btn = make("button", "rtx-fx-" + type, "rtx-fx" + (externalIcons[type] ? "" : " generic"));
+      var hasIcon = !!(externalIcons[e.icon] || externalIcons[type]);
+      var btn = make("button", "rtx-fx-" + type, "rtx-fx" + (hasIcon ? "" : " generic"));
       btn.setAttribute("data-fx", type);
       btn.title = name;
       btn.setAttribute("aria-label", name);
-      btn.innerHTML = iconFor(type);
+      btn.innerHTML = iconFor(type, e);
       btn.addEventListener("click", function () {
         selectEffect(type);
       });
@@ -359,11 +441,43 @@
     keys.forEach(function (key) {
       var e = effects[key] || {};
       out[key] = {
-        name: e.name || key,
-        params: e.params && typeof e.params === "object" ? e.params : {},
+        name: e.label || e.name || key,
+        category: e.category,
+        icon: e.icon,
+        viewerUrl: e.viewerUrl,
+        consoleUrl: e.consoleUrl || null,
+        params: e.params && typeof e.params === "object" && !Array.isArray(e.params) ? e.params : {},
       };
     });
     return out;
+  }
+
+  function loadScriptTag(url) {
+    return new Promise(function (resolve) {
+      var s = document.createElement("script");
+      s.src = url;
+      s.onload = function () {
+        resolve(true);
+      };
+      s.onerror = function () {
+        resolve(false);
+      };
+      document.head.appendChild(s);
+    });
+  }
+
+  function loadConsolePlugins(meta) {
+    var jobs = [];
+    Object.keys(meta).forEach(function (type) {
+      var url = meta[type] && meta[type].consoleUrl;
+      if (!url) return;
+      jobs.push(
+        loadScriptTag(srvUrl + url).then(function (ok) {
+          if (!ok) console.warn("[control] console 插件載入失敗，使用 schema 渲染", srvUrl + url);
+        })
+      );
+    });
+    return Promise.all(jobs);
   }
 
   async function loadEffects() {
@@ -372,7 +486,10 @@
       if (!r.ok) throw new Error("status " + r.status);
       var data = await r.json();
       var meta = normalizeEffects(data);
-      if (meta) renderEffects(meta);
+      if (meta) {
+        await loadConsolePlugins(meta);
+        renderEffects(meta);
+      }
     } catch (err) {
       console.warn("[control] 特效表載入失敗，使用內建清單", err);
     }
@@ -404,9 +521,16 @@
     fieldDefs(selected).forEach(function (d) {
       var input = document.getElementById("rtx-p-" + d.key);
       if (!input) return;
-      if (d.coerce === "boolean") out[d.key] = input.value === "true";
-      else if (d.type === "number") out[d.key] = Number(input.value);
-      else out[d.key] = input.value;
+      if (d.coerce === "boolean") {
+        out[d.key] = input.value === "true";
+      } else if (d.type === "boolean") {
+        out[d.key] = input.checked === true;
+      } else if (d.type === "integer" || d.type === "number") {
+        var n = Number(input.value);
+        if (isNaN(n)) out[d.key] = d.def;
+        else if (d.type === "integer") out[d.key] = Math.round(n);
+        else out[d.key] = n;
+      } else out[d.key] = input.value;
     });
     return out;
   }

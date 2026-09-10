@@ -1,16 +1,43 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+import vm from "node:vm";
 import Effects from "../viewer/effects.js";
 
-const { EFFECTS, createEffect, toPixels, toPercent, clamp } = Effects;
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const { createEffect, toPixels, toPercent, clamp } = Effects;
 
-test("EFFECTS metadata has 4 types with params", () => {
-  assert.deepEqual(Object.keys(EFFECTS).sort(), ["firework", "particle", "ripple", "text"]);
-  for (const meta of Object.values(EFFECTS)) {
-    assert.equal(typeof meta.name, "string");
-    assert.ok(meta.params && typeof meta.params === "object");
-    assert.ok(meta.params.duration > 0);
+function runPlugin(file, sandboxOverrides = {}) {
+  const src = readFileSync(join(root, file), "utf8");
+  const sandbox = Object.assign({ window: { Effects: Effects }, console }, sandboxOverrides);
+  vm.createContext(sandbox);
+  vm.runInContext(src, sandbox);
+  return sandbox;
+}
+
+test("viewer plugins no-op when window.Effects is missing", () => {
+  const src = readFileSync(join(root, "effects", "particle", "viewer.js"), "utf8");
+  const sandbox = { console };
+  vm.createContext(sandbox);
+  vm.runInContext(src, sandbox);
+  assert.equal(sandbox.window, undefined);
+});
+
+test("viewer plugins register all 4 effects", () => {
+  for (const id of ["particle", "ripple", "firework", "text"]) {
+    runPlugin(join("effects", id, "viewer.js"));
   }
+  assert.deepEqual(Object.keys(Effects.registry).sort(), ["firework", "particle", "ripple", "text"]);
+  for (const id of Object.keys(Effects.registry)) {
+    assert.equal(typeof Effects.registry[id], "function");
+  }
+});
+
+test("register rejects invalid registration", () => {
+  assert.throws(() => Effects.register(null, () => ({})), /invalid effect registration/);
+  assert.throws(() => Effects.register("x", "not-a-function"), /invalid effect registration/);
 });
 
 test("toPixels / toPercent round-trip", () => {
@@ -111,4 +138,25 @@ test("params merge over defaults (ripple color)", () => {
   e.update(100);
   e.draw(ctx);
   assert.equal(ctx.strokeStyle, "#abc123");
+});
+
+test("particle plugin defaults from local manifest values", () => {
+  const e = createEffect("particle", 0, 0, {});
+  Effects.stepEffect(e, 1200);
+  assert.equal(e.done(), true);
+});
+
+test("text plugin draw uses merged params", () => {
+  const e = createEffect("text", 10, 10, { content: "abc", size: 24 });
+  const ctx = {
+    globalAlpha: 0,
+    fillStyle: null,
+    font: "",
+    textAlign: "",
+    textBaseline: "",
+    fillText() {},
+  };
+  e.update(100);
+  e.draw(ctx);
+  assert.equal(ctx.font, "600 24px system-ui, sans-serif");
 });

@@ -48,6 +48,22 @@ python -m uvicorn server.main:app --port 8000   # server 中繼（專案根目�
 - console 嵌入其他網頁：`<link rel="stylesheet" href="http://<server-host>:8000/console/style.css">`＋`<script src="http://<server-host>:8000/console/icons.js"></script>`＋`<script src="http://<server-host>:8000/console/app.js" data-key="..."></script>`（可先定義 `window.CONTROL_CONFIG = { url, key }`）
 - 存取金鑰（可選）：server 設定環境變數 `ACCESS_KEY`；console 可於面板填入、嵌入用 `data-key="..."` 或 `window.CONTROL_CONFIG.key`
 
+## 特效結構（effects 插件架構）
+
+`effects/effects.json` 是唯一特效清單（manifest），server、viewer、console 皆由其驅動：
+
+- `effects/<id>/viewer.js`：特效繪製實作，執行時註冊 `window.Effects.register(id, factory)`
+- `effects/<id>/console.js`（選用）：自訂 console 參數 UI，註冊 `window.RTX_EFFECT_CONSOLE.register(id, { icon, render })`；缺省时 console 依 schema 自動渲染
+- `params` schema 型別：`integer`／`number`／`string`／`color`／`boolean`／`select`／`array`；`editable: false` 不顯示輸入項；`POST /api/effect` 的 params 由 server 依 schema 驗證（無效值回退預設值）
+
+相關 server 路由（皆 `Cache-Control: no-store`）：
+
+- `GET /effects/effects.json`
+- `GET /effects/{effect_id}/viewer.js`
+- `GET /effects/{effect_id}/console.js`
+
+新增特效：在 `effects/effects.json` 加一個 entry ＋ 建立 `effects/<id>/viewer.js` 即可；server／console 程式碼不需修改。
+
 ## 嵌入示範頁（examples，opt-in）
 
 `examples/` 提供宿主網頁嵌入示範頁（viewer／console／兩者），**預設停用**；須設定環境變數 `SERVE_EXAMPLES=1`（接受 `1`／`true`／`yes`，不分大小寫）並重新啟動 server：

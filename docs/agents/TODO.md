@@ -12,7 +12,7 @@
 
 - SSE 斷線期間特效遺失（規格：不重播）
 - 限頻為全域滑動視窗（未區分客戶端）
-- 前端（console/viewer）無瀏覽器自動化測試；console 有 node vm 冒煙測試（tests/test_console.mjs，39 項），viewer 仍無
+- 前端（console/viewer）無瀏覽器自動化測試；console 有 node vm 冒煙測試（tests/test_console.mjs，45 項），viewer 有 node vm 冒煙測試（tests/test_effects.mjs，17 項）
 
 ## 第一階段：建立可維護的執行基礎
 
@@ -41,6 +41,7 @@
 - [x] examples 改為 demo／showcase 頁：移除 standalone 展示頁 `console/index.html`、`viewer/index.html`；`shared/app.js` 移至 `viewer/app.js`（server `/app.js` 改 serve `viewer/app.js`，`shared/` 目錄移除；`examples/index.html` 不再連結 standalone 頁）（2026-09-10）
 - [x] viewer：移除無頁面引用的 `viewer/style.css`（standalone viewer 頁與 examples 嵌入頁皆不再使用）（2026-09-10）
 - [x] server API：embed asset routes 改名為 namespaced paths（`/viewer/app.js`、`/viewer/effects.js`、`/console/app.js`、`/console/icons.js`、`/console/style.css`；舊根路徑 asset routes 回 404）；429 回應加 `Retry-After: 1`，SSE 不再手動發送 `Connection: keep-alive`（2026-09-10）
+- [x] effects：manifest 驅動架構（`effects/effects.json` 為唯一清單；`effects/<id>/viewer.js` 註冊 `window.Effects`、選用 `effects/<id>/console.js` 註冊 `window.RTX_EFFECT_CONSOLE`；server 新增 `GET /api/effects` 清洗 schema、`POST /api/effect` 依 schema 驗證 params（無效值回退預設）、靜態路由 `/effects/effects.json`、`/effects/{id}/viewer.js`、`/effects/{id}/console.js`（path traversal 防護、no-store）；viewer/app.js 載入 `/api/effects` 後動態載入各 viewer.js；console/app.js 改 schema 驅動渲染＋選用 console 插件（失敗回退 schema）；tests/test_api.py 33 項、tests/test_effects.mjs 17 項、tests/test_console.mjs 45 項）（2026-09-10）
 - [ ] server 斷線重播暫存（最近 N 則）
 - [ ] viewer 狀態回報（POST /api/status）
 - [ ] 多 viewer 負載／效能測試

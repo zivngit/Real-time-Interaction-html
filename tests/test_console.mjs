@@ -12,26 +12,70 @@ const css = readFileSync(join(root, "console", "style.css"), "utf8");
 
 const DEFAULT_EFFECTS = {
   particle: {
-    name: "粒子爆散",
-    params: { color: "#ff0044", count: 40, spread: 360, speed: 0.35, duration: 1200 },
+    label: "粒子爆散",
+    category: "burst",
+    icon: "particle",
+    viewerUrl: "/effects/particle/viewer.js",
+    consoleUrl: "/effects/particle/console.js",
+    params: {
+      color: { type: "color", label: "顏色", default: "#ff0044" },
+      count: { type: "integer", label: "數量", default: 40, min: 1, max: 400, step: 1 },
+      spread: { type: "number", label: "散佈(度)", default: 360, min: 0, max: 360, step: 5 },
+      speed: { type: "number", label: "速度", default: 0.35, min: 0.05, max: 2, step: 0.05 },
+      duration: { type: "integer", label: "持續(ms)", default: 1200, min: 200, max: 8000, step: 100 },
+    },
   },
   ripple: {
-    name: "漣漪圈",
-    params: { color: "#44aaff", maxRadius: 200, duration: 1200 },
+    label: "漣漪圈",
+    category: "ripple",
+    icon: "ripple",
+    viewerUrl: "/effects/ripple/viewer.js",
+    consoleUrl: "/effects/ripple/console.js",
+    params: {
+      color: { type: "color", label: "顏色", default: "#44aaff" },
+      maxRadius: { type: "number", label: "最大半徑", default: 200, min: 20, max: 600, step: 10 },
+      duration: { type: "integer", label: "持續(ms)", default: 1200, min: 200, max: 8000, step: 100 },
+    },
   },
   firework: {
-    name: "煙火",
-    params: { colors: ["#ff5252", "#ffd740", "#40c4ff", "#69f0ae"], count: 90, duration: 1800 },
+    label: "煙火",
+    category: "burst",
+    icon: "firework",
+    viewerUrl: "/effects/firework/viewer.js",
+    consoleUrl: null,
+    params: {
+      colors: {
+        type: "array",
+        items: "color",
+        label: "顏色",
+        default: ["#ff5252", "#ffd740", "#40c4ff", "#69f0ae"],
+        minItems: 1,
+        maxItems: 8,
+        editable: false,
+      },
+      count: { type: "integer", label: "數量", default: 90, min: 1, max: 400, step: 1 },
+      duration: { type: "integer", label: "持續(ms)", default: 1800, min: 200, max: 8000, step: 100 },
+    },
   },
   text: {
-    name: "浮現文字",
-    params: { content: "Hello", size: 32, duration: 2000, color: "#ffffff" },
+    label: "浮現文字",
+    category: "text",
+    icon: "text",
+    viewerUrl: "/effects/text/viewer.js",
+    consoleUrl: "/effects/text/console.js",
+    params: {
+      content: { type: "string", label: "文字", default: "Hello", maxLength: 20 },
+      color: { type: "color", label: "顏色", default: "#ffffff" },
+      size: { type: "integer", label: "字級", default: 32, min: 8, max: 160, step: 2 },
+      duration: { type: "integer", label: "持續(ms)", default: 2000, min: 200, max: 10000, step: 100 },
+    },
   },
 };
 
 async function makeEnv(opts = {}) {
   const created = new Map();
   const fetchCalls = [];
+  const scriptLoads = [];
   const windowListeners = {};
   const store = { ...(opts.stored || {}) };
 
@@ -127,6 +171,20 @@ async function makeEnv(opts = {}) {
   const body = makeEl("body");
   const head = makeEl("head");
 
+  const origHeadAppend = head.appendChild.bind(head);
+  head.appendChild = (c) => {
+    const result = origHeadAppend(c);
+    if (c.tagName === "script" && c.src) {
+      scriptLoads.push(c.src);
+      setTimeout(() => {
+        const fail = (opts.scriptFailPatterns || []).some((re) => re.test(c.src));
+        if (fail) (c.onerror || (() => {}))();
+        else (c.onload || (() => {}))();
+      }, 0);
+    }
+    return result;
+  };
+
   const document = {
     head,
     body,
@@ -164,6 +222,11 @@ async function makeEnv(opts = {}) {
       (windowListeners[t] ??= []).push(fn);
     },
   };
+  if (typeof opts.consoleRegistry === "function") {
+    window.RTX_EFFECT_CONSOLE = opts.consoleRegistry(document);
+  } else if (opts.consoleRegistry) {
+    window.RTX_EFFECT_CONSOLE = opts.consoleRegistry;
+  }
 
   const sandbox = {
     window,
@@ -194,6 +257,7 @@ async function makeEnv(opts = {}) {
     body,
     head,
     fetchCalls,
+    scriptLoads,
     store,
     win: window,
     fireWindow: (t, evt) => (windowListeners[t] || []).slice().forEach((fn) => fn(evt)),
@@ -424,35 +488,146 @@ test("number input constraints are set", async () => {
   assert.equal(count.step, 1);
 });
 
-test("window click sends current input values", async () => {
+test("editable:false array param is not rendered", async () => {
   const env = await makeEnv();
-  env.node("rtx-p-count").value = "77";
-  env.node("rtx-p-speed").value = "0.9";
-  bodyClick(env, 100, 50);
+  env.node("rtx-fx-firework")._fire("click");
+  assert.equal(env.node("rtx-p-colors"), null);
+  assert.ok(env.node("rtx-p-count"));
+  assert.ok(env.node("rtx-p-duration"));
+});
+
+test("string maxLength is applied to text input", async () => {
+  const env = await makeEnv();
+  env.node("rtx-fx-text")._fire("click");
+  assert.equal(env.node("rtx-p-content").type, "text");
+  assert.equal(env.node("rtx-p-content").maxLength, 20);
+});
+
+test("schema boolean and select fields render and convert", async () => {
+  const env = await makeEnv({
+    effects: {
+      spark: {
+        name: "Spark",
+        params: {
+          enabled: { type: "boolean", label: "啟用", default: true },
+          mode: {
+            type: "select",
+            label: "模式",
+            default: "a",
+            options: [
+              { value: "a", label: "A" },
+              { value: "b", label: "B" },
+            ],
+          },
+        },
+      },
+    },
+  });
+  const enabled = env.node("rtx-p-enabled");
+  assert.equal(enabled.type, "checkbox");
+  assert.equal(enabled.checked, true);
+  const mode = env.node("rtx-p-mode");
+  assert.equal(mode.tagName, "select");
+  assert.equal(mode._children.length, 2);
+  assert.equal(mode._children[1].value, "b");
+  assert.equal(mode.value, "a");
+  env.node("rtx-p-enabled").checked = false;
+  env.node("rtx-p-mode").value = "b";
+  bodyClick(env, 10, 10);
   const body = JSON.parse(lastEffectCall(env).opts.body);
-  assert.equal(body.params.count, 77);
-  assert.equal(body.params.speed, 0.9);
-  assert.equal(body.params.color, "#ff0044");
+  assert.deepEqual(body.params, { enabled: false, mode: "b" });
 });
 
-test("panel starts collapsed", async () => {
+test("integer param is rounded by paramsFor", async () => {
   const env = await makeEnv();
-  assert.equal(env.node("rtx-panel").classList.contains("open"), false);
-  assert.equal(env.node("rtx-fab").getAttribute("aria-expanded"), "false");
+  env.node("rtx-p-count").value = "40.6";
+  bodyClick(env, 10, 10);
+  const body = JSON.parse(lastEffectCall(env).opts.body);
+  assert.equal(body.params.count, 41);
 });
 
-test("fab click toggles panel open then closed", async () => {
+test("loads console plugins from consoleUrl and falls back to schema render", async () => {
   const env = await makeEnv();
-  const fab = env.node("rtx-fab");
-  const panel = env.node("rtx-panel");
-  fab._fire("click");
-  assert.equal(panel.classList.contains("open"), true);
-  assert.equal(fab.classList.contains("active"), true);
-  assert.equal(fab.getAttribute("aria-expanded"), "true");
-  fab._fire("click");
-  assert.equal(panel.classList.contains("open"), false);
-  assert.equal(fab.classList.contains("active"), false);
-  assert.equal(fab.getAttribute("aria-expanded"), "false");
+  assert.deepEqual(env.scriptLoads, [
+    "http://localhost:8000/effects/particle/console.js",
+    "http://localhost:8000/effects/ripple/console.js",
+    "http://localhost:8000/effects/text/console.js",
+  ]);
+  env.node("rtx-fx-particle")._fire("click");
+  assert.ok(env.node("rtx-p-count"));
+  assert.ok(env.node("rtx-p-color"));
+});
+
+test("console plugin load failure keeps schema rendering", async () => {
+  const env = await makeEnv({
+    scriptFailPatterns: [/effects\/particle\/console\.js/],
+  });
+  assert.ok(env.node("rtx-p-count"));
+  assert.ok(env.node("rtx-p-color"));
+  assert.ok(env.node("rtx-p-duration"));
+});
+
+test("registered console plugin overrides schema render", async () => {
+  const env = await makeEnv({
+    consoleRegistry: (doc) => {
+      const registry = { registry: {} };
+      registry.register = (t, p) => {
+        registry.registry[t] = p;
+      };
+      registry.registry.particle = {
+        icon: "particle",
+        render(container, api) {
+          const field = doc.createElement("div");
+          field.className = "rtx-field";
+          const label = doc.createElement("label");
+          label.textContent = "自訂數量";
+          const input = doc.createElement("input");
+          input.id = "rtx-p-count";
+          input.type = "number";
+          input.value = api.defaults.count;
+          field.appendChild(label);
+          field.appendChild(input);
+          container.appendChild(field);
+        },
+      };
+      return registry;
+    },
+  });
+  const body = env.node("rtx-params-body");
+  assert.equal(body._children.length, 1);
+  const label = body._children[0]._children[0];
+  assert.equal(label.textContent, "自訂數量");
+  const input = body._children[0]._children[1];
+  assert.equal(input.value, 40);
+  input.value = "77";
+  bodyClick(env, 10, 10);
+  const sent = JSON.parse(lastEffectCall(env).opts.body);
+  assert.equal(sent.params.count, 77);
+});
+
+test("console plugin source no-ops without RTX_EFFECT_CONSOLE", async () => {
+  const pluginSrc = readFileSync(join(root, "effects", "particle", "console.js"), "utf8");
+  const sandbox = { window: {}, console: { info() {}, warn() {} } };
+  vm.createContext(sandbox);
+  vm.runInContext(pluginSrc, sandbox);
+  assert.equal(sandbox.window.RTX_EFFECT_CONSOLE, undefined);
+});
+
+test("console plugin source registers into existing RTX_EFFECT_CONSOLE", async () => {
+  const pluginSrc = readFileSync(join(root, "effects", "particle", "console.js"), "utf8");
+  const registry = { registry: {} };
+  registry.register = (t, p) => {
+    registry.registry[t] = p;
+  };
+  const sandbox = {
+    window: { RTX_EFFECT_CONSOLE: registry },
+    console: { info() {}, warn() {} },
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(pluginSrc, sandbox);
+  assert.equal(typeof registry.registry.particle, "object");
+  assert.equal(typeof registry.registry.particle.render, "function");
+  assert.equal(registry.registry.particle.icon, "particle");
 });
 
 test("click on body sends effect with 0-100 coords", async () => {

@@ -13,12 +13,22 @@
   var base = String(cfg.url || origin || "http://localhost:8000").replace(/\/+$/, "");
   var key = cfg.key || (script ? script.getAttribute("data-key") : "") || "";
 
+  function loadScript(src) {
+    return new Promise(function (resolve) {
+      var s = document.createElement("script");
+      s.src = src;
+      s.onload = function () {
+        resolve(true);
+      };
+      s.onerror = function () {
+        resolve(false);
+      };
+      document.head.appendChild(s);
+    });
+  }
+
   function boot() {
-    console.info("[effects] v3 已載入（牆時計時＋每幀清除重繪，無殘影）", (script && script.src) || "(inline)");
-    if (typeof Effects === "undefined") {
-      console.error("[effects] Effects (effects.js) 未載入");
-      return;
-    }
+    console.info("[effects] v4 已載入（manifest 動態載入特效插件）", (script && script.src) || "(inline)");
 
     var canvas = document.createElement("canvas");
     canvas.style.cssText =
@@ -131,15 +141,43 @@
     }, 5000);
   }
 
-  if (typeof Effects !== "undefined") {
+  async function start() {
+    if (typeof Effects === "undefined") {
+      var coreOk = await loadScript(base + "/viewer/effects.js");
+      if (!coreOk || typeof Effects === "undefined") {
+        console.error("[effects] Effects (viewer/effects.js) 載入失敗");
+        return;
+      }
+    }
+
+    var effects = {};
+    try {
+      var r = await fetch(base + "/api/effects");
+      if (!r.ok) throw new Error("status " + r.status);
+      var manifest = await r.json();
+      effects = (manifest && manifest.effects) || {};
+    } catch (err) {
+      console.error("[effects] /api/effects 載入失敗", err);
+    }
+
+    var urls = Object.keys(effects)
+      .map(function (id) {
+        return effects[id] && effects[id].viewerUrl;
+      })
+      .filter(Boolean);
+    if (urls.length) {
+      var results = await Promise.all(
+        urls.map(function (u) {
+          return loadScript(base + u);
+        })
+      );
+      urls.forEach(function (u, i) {
+        if (!results[i]) console.warn("[effects] 特效插件載入失敗，略過", u);
+      });
+    }
+
     boot();
-  } else {
-    var s = document.createElement("script");
-    s.src = base + "/viewer/effects.js";
-    s.onload = boot;
-    s.onerror = function () {
-      console.error("[effects] effects.js 載入失敗", s.src);
-    };
-    document.head.appendChild(s);
   }
+
+  start();
 })();
