@@ -206,3 +206,37 @@ def test_sse_access_key(live_server, monkeypatch):
         assert r.status_code == 200
         first = next(r.iter_lines())
     assert first.startswith("retry:")
+
+
+def test_examples_disabled_by_default(client, monkeypatch):
+    monkeypatch.delenv("SERVE_EXAMPLES", raising=False)
+    for route in (
+        "/examples",
+        "/examples/",
+        "/examples/index.html",
+        "/examples/embed-viewer.html",
+        "/examples/embed-console.html",
+        "/examples/embed-both.html",
+    ):
+        assert client.get(route).status_code == 404
+
+
+def test_examples_enabled_when_serve_examples_set(client, monkeypatch):
+    monkeypatch.setenv("SERVE_EXAMPLES", "1")
+    r = client.get("/examples/index.html")
+    assert r.status_code == 200
+    assert "html" in r.headers["content-type"]
+    assert r.headers["cache-control"] == "no-store"
+    for name in ("embed-viewer.html", "embed-console.html", "embed-both.html"):
+        assert name in r.text
+    r = client.get("/examples/embed-viewer.html")
+    assert r.status_code == 200
+    assert "/app.js" in r.text
+    r = client.get("/examples/embed-console.html")
+    assert r.status_code == 200
+    for asset in ("/console.css", "/icons.js", "/console.js"):
+        assert asset in r.text
+    r = client.get("/examples/embed-both.html")
+    assert r.status_code == 200
+    assert "/app.js" in r.text
+    assert "/console.js" in r.text

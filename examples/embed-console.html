@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>embed-console — 嵌入示範</title>
+</head>
+<body>
+<h1>宿主網頁示範：嵌入 console</h1>
+<p>這是宿主網頁的內容。console 依序載入 <code>/console.css</code>、<code>/icons.js</code>、<code>/console.js</code>，載入後右下角出現 FAB，可發送特效至所有 viewer。</p>
+<button type="button">宿主按鈕（示範）</button>
+<ul>
+  <li>宿主內容項目一</li>
+  <li>宿主內容項目二</li>
+</ul>
+<link rel="stylesheet" href="/console.css">
+<script src="/icons.js"></script>
+<!-- 若 server 有設定 ACCESS_KEY 環境變數，請將下方 data-key 填入對應金鑰；未設定則留空 -->
+<script src="/console.js" data-key=""></script>
+</body>
+</html>

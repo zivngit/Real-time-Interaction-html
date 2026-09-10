@@ -37,6 +37,7 @@
 - [x] console/server/viewer：分離 JS/CSS；console 樣式抽至 `console/style.css`、viewer 樣式抽至 `viewer/style.css`；特效實作移至 `viewer/effects.js`；server 特效列表抽至 `server/effects.py`（2026-09-10）
 - [x] console：SVG icons 抽至 `console/icons.js`（server 新增 `GET /icons.js`；console 嵌入需先載入 `/icons.js`）（2026-09-10）
 - [x] console：剩餘 UI SVG 亦移入 `console/icons.js`（以 `RTX_EFFECT_ICONS`／`RTX_UI_ICONS` 區分特效與 console UI icons）（2026-09-10）
+- [x] examples：opt-in 嵌入示範頁（`examples/` 四頁；server 新增 `GET /examples`、`/examples/`、`/examples/{path:path}`，預設 404，`SERVE_EXAMPLES=1` 啟用；tests/test_api.py 新增 2 項）（2026-09-10）
 - [ ] server 斷線重播暫存（最近 N 則）
 - [ ] viewer 狀態回報（POST /api/status）
 - [ ] 多 viewer 負載／效能測試

@@ -9,12 +9,15 @@ flowchart LR
     C["console/index.html<br/>console/icons.js + console/app.js + console/style.css"]
     S["server/main.py<br/>server/effects.py（FastAPI）"]
     V["viewer/index.html<br/>viewer/effects.js + shared/app.js + viewer/style.css"]
+    E["examples/*.html<br/>（opt-in：SERVE_EXAMPLES=1）"]
     LS[("localStorage<br/>rtx.srvUrl / rtx.srvKey")]
     C -->|"POST /api/effect、POST /api/clear"| S
     C -->|"GET /api/effects"| S
     S -->|"GET /api/stream<br/>(SSE: effect / clear / ping)"| V
     S -->|"GET /app.js、/effects.js (no-store)"| V
     S -->|"GET /icons.js、/console.js、/console.css (no-store)"| C
+    S -->|"GET /examples/*（no-store，opt-in）"| E
+    E -->|"載入 /app.js、/console.css、/icons.js、/console.js"| S
     LS -.-> C
 ```
 
@@ -32,12 +35,14 @@ flowchart TD
         H["GET /health"]
         LE["GET /api/effects"]
         JS["GET /app.js / /effects.js / /icons.js / /console.js / /console.css"]
+        EX["GET /examples / /examples/ / /examples/{path}"]
     end
 
     subgraph guard["驗證"]
         CK["_check_key（X-Access-Key / ?key）"]
         VE{"effect 在 EFFECTS 中？"}
         RL["_rate_limit（滑動視窗 20/s）"]
+        EN{"SERVE_EXAMPLES 啟用？"}
     end
 
     subgraph push["廣播 / SSE 串流"]
@@ -54,6 +59,7 @@ flowchart TD
         E401["HTTP 401 invalid access key"]
         E400["HTTP 400 unknown effect"]
         E429["HTTP 429 rate limit exceeded"]
+        E404["HTTP 404 examples 停用或檔案不存在"]
     end
 
     subgraph plain["簡單回應"]
@@ -82,6 +88,9 @@ flowchart TD
     H --> OK
     LE --> LOK
     JS --> FR
+    EX --> EN
+    EN -- "否" --> E404
+    EN -- "是（解析路徑於 examples/ 內）" --> FR
 ```
 
 ## 3. 即時互動序列（console → server → viewer）
@@ -195,7 +204,7 @@ classDiagram
 
 ```mermaid
 flowchart LR
-    TA["tests/test_api.py<br/>pytest＋TestClient（15）"] --> M["server/main.py"]
+    TA["tests/test_api.py<br/>pytest＋TestClient（17）"] --> M["server/main.py"]
     TE["tests/test_effects.mjs<br/>node --test（13）"] --> S["viewer/effects.js"]
     TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（39）"] --> K["console/app.js"]
 ```

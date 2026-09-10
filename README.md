@@ -49,6 +49,32 @@ python -m uvicorn server.main:app --port 8000   # server 中繼（專案根目�
 - console 嵌入其他網頁：`<link rel="stylesheet" href="http://<server-host>:8000/console.css">`＋`<script src="http://<server-host>:8000/icons.js"></script>`＋`<script src="http://<server-host>:8000/console.js" data-key="..."></script>`（可先定義 `window.CONTROL_CONFIG = { url, key }`）
 - 存取金鑰（可選）：server 設定環境變數 `ACCESS_KEY`；console 可於面板填入、嵌入用 `data-key="..."` 或 `window.CONTROL_CONFIG.key`
 
+## 嵌入示範頁（examples，opt-in）
+
+`examples/` 提供宿主網頁嵌入示範頁（viewer／console／兩者），**預設停用**；須設定環境變數 `SERVE_EXAMPLES=1`（接受 `1`／`true`／`yes`，不分大小寫）並重新啟動 server：
+
+PowerShell：
+
+```powershell
+$env:SERVE_EXAMPLES = "1"
+python -m uvicorn server.main:app --port 8000
+```
+
+cmd：
+
+```cmd
+set SERVE_EXAMPLES=1 && python -m uvicorn server.main:app --port 8000
+```
+
+啟用後可存取：
+
+- `http://localhost:8000/examples/`（示範頁索引）
+- `http://localhost:8000/examples/embed-viewer.html`（僅嵌入 viewer：`/app.js`）
+- `http://localhost:8000/examples/embed-console.html`（僅嵌入 console：`/console.css`＋`/icons.js`＋`/console.js`）
+- `http://localhost:8000/examples/embed-both.html`（同時嵌入 viewer 與 console）
+
+未啟用時上述路線皆回 404。若 server 已設定 `ACCESS_KEY`，console 示範頁需將 `<script src="/console.js" data-key="">` 的 `data-key` 填入對應金鑰才能發送特效。
+
 測試：
 
 ```

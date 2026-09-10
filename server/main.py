@@ -19,6 +19,7 @@ VIEWER_EFFECTS_JS = ROOT / "viewer" / "effects.js"
 CONSOLE_APP_JS = ROOT / "console" / "app.js"
 CONSOLE_ICONS_JS = ROOT / "console" / "icons.js"
 CONSOLE_CSS = ROOT / "console" / "style.css"
+EXAMPLES_DIR = ROOT / "examples"
 
 ACCESS_KEY = os.getenv("ACCESS_KEY", "").strip()
 
@@ -182,3 +183,29 @@ async def console_css():
     if not CONSOLE_CSS.exists():
         raise HTTPException(status_code=404, detail="console/style.css not found")
     return FileResponse(CONSOLE_CSS, media_type="text/css", headers=NO_STORE)
+
+
+def _examples_enabled() -> bool:
+    return os.getenv("SERVE_EXAMPLES", "").strip().lower() in {"1", "true", "yes"}
+
+
+def _examples_response(path: str):
+    if not _examples_enabled():
+        raise HTTPException(status_code=404, detail="examples not enabled")
+    rel = "index.html" if path in ("", "index.html") else path
+    target = (EXAMPLES_DIR / rel).resolve()
+    base = EXAMPLES_DIR.resolve()
+    if not target.is_relative_to(base) or not target.is_file():
+        raise HTTPException(status_code=404, detail="examples file not found")
+    return FileResponse(target, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/examples")
+@app.get("/examples/")
+async def examples_index():
+    return _examples_response("index.html")
+
+
+@app.get("/examples/{path:path}")
+async def examples_file(path: str):
+    return _examples_response(path)
