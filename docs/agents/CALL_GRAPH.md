@@ -1,74 +1,173 @@
 # Real-time Interaction html 函式呼叫關係圖
 
-> **圖型不固定**：Agent 繪製前須評估內容性質，選擇最能表達該節的 mermaid 圖型（如 `flowchart`、`classDiagram`、`sequenceDiagram`、`stateDiagram-v2`、`erDiagram`），不得一律使用 flowchart。
+> 最後更新：2026-09-10
 
-## 模組責任
+## 1. 整體架構
 
-| 模組 | 主要責任 |
-| --- | --- |
-| `server/main.py` | 中繼後端（FastAPI）：驗證、限頻、SSE 廣播、提供 `/app.js`、`/effects.js`（附 `Cache-Control: no-store`，避免瀏覽器快取舊版腳本） |
-| `shared/effects.js` | 特效定義與動畫計算（particle/ripple/firework/text）、座標換算、`stepEffect` 牆時推進（substep ≤50ms）；browser/node 雙用（UMD） |
-| `shared/app.js` | 顯示端嵌入腳本：canvas 疊層（pointer-events: none）、SSE 訂閱（狀態切換才 log）、rAF＋setInterval 雙驅動渲染迴圈（特效以 born/elapsed 牆時計時，背景分頁不凍結；**每 tick 先移除完成特效 → clearRect → 重繪全部 active**，canvas 為當下狀態純函數，無殘影/像素累積）、啟動 log 版本標記 v3（可於 F12 確認載入版本） |
-| `console/index.html`＋`console/app.js` | 控制端：懸浮按鈕 `#fab` 展開/收合面板（預設收合，`#panel.open` 顯示）、**按住 `#fab` 拖曳移動**（位移 >8px 即啟動、無時間等待；`applyFabPos`：fab 與 panel 皆 clamp 於視窗內、`#panel` 跟隨、window resize 再 clamp）、特效選擇、參數設定、點擊座標 → POST server（點擊 `#fab`/`#panel` 不觸發發送；拖曳後之 click 被抑制不 toggle） |
-| `viewer/index.html` | 顯示端獨立預覽頁（引用 shared/effects.js＋shared/app.js） |
+```mermaid
+flowchart LR
+    C["console/index.html<br/>console/app.js"]
+    S["server/main.py<br/>(FastAPI)"]
+    V["viewer/index.html<br/>shared/app.js + shared/effects.js"]
+    LS[("localStorage<br/>rtx.srvUrl / rtx.srvKey")]
+    C -->|"POST /api/effect、POST /api/clear"| S
+    S -->|"GET /api/stream<br/>(SSE: effect / clear / ping)"| V
+    S -->|"GET /app.js、/effects.js (no-store)"| V
+    LS -.-> C
+```
 
-## 1. 啟動與 server 端路由
+## 2. server 路由與請求驗證
+
+> 節點依管線階層由上至下排列（進入點 → 驗證 → 廣播/串流），同階層以 subgraph 分組，錯誤回應與簡單回應各置獨立分組，避免關係線交錯。
 
 ```mermaid
 flowchart TD
-    A[uvicorn server.main:app] --> C[FastAPI app]
-    C --> R1[POST /api/effect]
-    C --> R2[POST /api/clear]
-    C --> R3[GET /api/stream SSE]
-    C --> R4[GET /api/effects]
-    C --> R5[GET /app.js、/effects.js（no-store）]
-    C --> R6[GET /health]
-    R1 --> P1[_check_key → _rate_limit → _broadcast]
-    R2 --> P1
-    P1 --> Q[(subscriber queues)]
-    Q --> R3
+    subgraph entry["HTTP 進入點"]
+        direction LR
+        PE["POST /api/effect"]
+        PC["POST /api/clear"]
+        ST["GET /api/stream"]
+        H["GET /health"]
+        LE["GET /api/effects"]
+        JS["GET /app.js / /effects.js"]
+    end
+
+    subgraph guard["驗證"]
+        CK["_check_key（X-Access-Key / ?key）"]
+        VE{"effect 在 EFFECTS 中？"}
+        RL["_rate_limit（滑動視窗 20/s）"]
+    end
+
+    subgraph push["廣播 / SSE 串流"]
+        BC["_broadcast：put_nowait 至各訂閱 queue"]
+        SUB["_subscribers.add(queue)"]
+        GEN["generate（循環）：retry: 3000 → queue.get(timeout=15s)"]
+        PING["yield event: ping（心跳）"]
+        MSG["yield event: effect / clear"]
+        DIS["_subscribers.discard(queue)（finally）"]
+    end
+
+    subgraph err["錯誤回應"]
+        direction LR
+        E401["HTTP 401 invalid access key"]
+        E400["HTTP 400 unknown effect"]
+        E429["HTTP 429 rate limit exceeded"]
+    end
+
+    subgraph plain["簡單回應"]
+        direction LR
+        OK["200 {ok, ts}"]
+        LOK["200 EFFECTS 目錄"]
+        FR["FileResponse（no-store）"]
+    end
+
+    PE --> CK
+    PC --> CK
+    ST --> CK
+    CK -- "金鑰不符" --> E401
+    CK -- "effect 請求" --> VE
+    CK -- "clear 請求" --> RL
+    CK -- "stream 請求" --> SUB
+    VE -- "否" --> E400
+    VE -- "是" --> RL
+    RL -- "超限" --> E429
+    RL --> BC
+    SUB --> GEN
+    GEN -- "15s 逾時" --> PING
+    GEN -- "收到訊息" --> MSG
+    GEN -. "循環：get → yield → get" .-> GEN
+    GEN -. "斷線 → finally" .-> DIS
+    H --> OK
+    LE --> LOK
+    JS --> FR
 ```
 
-## 2. 前端（console 控制、viewer 顯示）
+## 3. 即時互動序列（console → server → viewer）
 
 ```mermaid
-flowchart TD
-    A0[#fab click] --> A0a[panel.classList.toggle("open")＋fab active/aria-expanded]
-    A0b[#fab 按住＋位移 >8px] --> A0c[drag.active → pointermove 拖曳]
-    A0c --> A0d[applyFabPos：fab/panel 座標皆 clamp 視窗內＋panel 跟隨]
-    A0d -. "pointerup 結束拖曳＋抑制隨後 click" .-> A0d
-    A1[window click] --> A1a{target closest #panel/#fab?}
-    A1a -- 是 --> A1b[ignore（不發送）]
-    A1a -- 否 --> A2[console/app.js post /api/effect]
-    A3[清屏按鈕] --> A4[console/app.js post /api/clear]
-    S1[SSE event: effect] --> B1[shared/app.js handleEffect：born/elapsed 初始化]
-    B1 --> B2[Effects.toPixels → Effects.createEffect]
-    B2 --> B3[spawn → tick：stepEffect 牆時推進 → 移除完成特效 → clearRect → 重繪 active]
-    B3 -. "rAF 前台平滑" .-> B3
-    B3 -. "setInterval 100ms 背景補幀" .-> B3
-    S2[SSE event: clear] --> B4[clearAll]
-    S3[SSE event: ping] --> B5[lastPing 更新（離線偵測，逾時 log 一次）]
-    S4[SSE open/error] --> B6[連線狀態切換 log（open→已連線、error→斷線重連中）]
+sequenceDiagram
+    autonumber
+    participant C as console（console/app.js）
+    participant S as server（server/main.py）
+    participant V as viewer（shared/app.js）
+
+    C->>S: POST /api/effect {effect, x, y, params}
+    S->>S: _check_key → effect 驗證 → _rate_limit → _broadcast
+    S-->>V: SSE event: effect
+    V->>V: handleEffect：Effects.toPixels → Effects.createEffect → born/elapsed
+    V->>V: spawn → tick（rAF＋setInterval 100ms）
+    C->>S: POST /api/clear
+    S-->>V: SSE event: clear
+    V->>V: clearAll：active=[]＋clearRect＋log
+    S-->>V: SSE event: ping（15s 無事件時）
+    V->>V: lastPing 更新（逾 45s 未收到 ping → log 一次）
+    Note over V: EventSource open/error → 連線狀態切換 log
 ```
 
-## 3. 主要呼叫路徑（server）
-
-| 路徑 | 說明 |
-| --- | --- |
-| `post_effect → _check_key → _rate_limit → _broadcast → queues → stream.generate` | 特效驗證並推送 |
-| `post_clear → _check_key → _rate_limit → _broadcast → queues → stream.generate` | 清屏推送 |
-| `stream → generate → queue.get(timeout=15) → event/ping` | SSE 串流；逾時發 ping 心跳 |
-| `generate finally → _subscribers.discard` | 斷線清理訂閱 |
-
-## 4. 測試關係
+## 4. viewer 特效渲染生命週期
 
 ```mermaid
-flowchart TD
-    T1[tests/test_api.py] --> M[server/main.py]
-    T2[tests/test_effects.mjs] --> S[shared/effects.js]
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Active : handleEffect → createEffect → spawn
+    Active --> Active : tick：stepEffect（牆時計時、子步 ≤50ms）→ 移除完成特效 → clearRect → 重繪 active
+    Active --> Idle : 全部 done() 或 clearAll
+    note right of Active
+        rAF 前台平滑；setInterval 100ms 背景補幀
+        牆時計時：elapsed 推進至 now-born，不依賴幀率
+    end note
 ```
 
-## 5. 未完成或未接線節點
+## 5. 模組依賴與主要呼叫路徑
+
+```mermaid
+classDiagram
+    class Effects {
+        +EFFECTS
+        +createEffect(type, px, py, params)
+        +stepEffect(effect, targetElapsed, maxStep)
+        +toPixels(x, y, w, h)
+        +toPercent(px, py, w, h)
+        +clamp(v, lo, hi)
+    }
+    class Effect {
+        +update(dt)
+        +done()
+        +draw(ctx)
+        +born
+        +elapsed
+    }
+    class Viewer {
+        +boot()
+        +resize()
+        +tick()
+        +spawn()
+        +clearAll()
+        +handleEffect(msg)
+    }
+    class Server {
+        +post_effect()
+        +post_clear()
+        +stream()
+        +_check_key()
+        +_rate_limit()
+        +_broadcast()
+    }
+    Viewer ..> Effects : toPixels / createEffect / stepEffect
+    Effects ..> Effect : 建立（particle / firework / ripple / text）
+    Server ..> Viewer : SSE effect / clear / ping
+```
+
+## 6. 測試關係
+
+```mermaid
+flowchart LR
+    TA["tests/test_api.py<br/>pytest＋TestClient（12）"] --> M["server/main.py"]
+    TE["tests/test_effects.mjs<br/>node --test（13）"] --> S["shared/effects.js"]
+    TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（11）"] --> K["console/app.js"]
+```
+
+## 7. 未完成或未接線節點
 
 | 節點 | 現況 |
 | --- | --- |
@@ -79,5 +178,5 @@ flowchart TD
 
 ```
 python -m pytest tests/ -v
-node --test tests/test_effects.mjs
+node --test tests/test_effects.mjs tests/test_console.mjs
 ```
