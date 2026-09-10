@@ -10,14 +10,20 @@ const src = readFileSync(join(root, "console", "app.js"), "utf8");
 
 function makeEnv(opts) {
   const els = new Map();
+  const created = new Map();
   const fetchCalls = [];
 
   function makeEl(id) {
     const el = {
       id, value: "", _listeners: {}, _classes: new Set(), _attrs: {}, _parent: null,
-      style: {}, offsetHeight: 0,
+      style: {}, offsetHeight: 0, _children: [],
       setPointerCapture() {}, releasePointerCapture() {},
+      appendChild(c) { el._children.push(c); return c; },
     };
+    Object.defineProperty(el, "innerHTML", {
+      get: () => "",
+      set: () => { el._children = []; },
+    });
     el.classList = {
       add: (c) => el._classes.add(c),
       remove: (c) => el._classes.delete(c),
@@ -52,6 +58,9 @@ function makeEnv(opts) {
     return b;
   });
 
+  ["srvUrl", "srvKey", "fab", "panel", "clearBtn",
+    "paramsBtn", "connBtn", "paramsPanel", "connPanel", "paramsBody"].forEach((id) => el(id));
+
   const windowListeners = {};
   const sandbox = {
     window: {
@@ -61,8 +70,17 @@ function makeEnv(opts) {
       addEventListener: (t, fn) => { (windowListeners[t] ??= []).push(fn); },
     },
     document: {
-      getElementById: (id) => el(id),
+      getElementById: (id) => (created.has(id) ? created.get(id) : els.has(id) ? els.get(id) : null),
       querySelectorAll: (sel) => (sel === "#fxButtons .fx" ? fxBtns : []),
+      createElement: (tag) => {
+        const node = makeEl(null);
+        node.tagName = tag;
+        Object.defineProperty(node, "id", {
+          get: () => node._id,
+          set: (v) => { node._id = v; if (v) created.set(v, node); },
+        });
+        return node;
+      },
     },
     localStorage: {
       getItem: () => null,
@@ -82,6 +100,7 @@ function makeEnv(opts) {
 
   return {
     el,
+    node: (id) => created.get(id) || null,
     fetchCalls,
     fireWindow: (t, evt) => (windowListeners[t] || []).forEach((fn) => fn(evt)),
   };
@@ -109,7 +128,7 @@ test("fab click toggles panel open then closed", () => {
 
 test("click on body sends effect with 0-100 coords", () => {
   const env = makeEnv();
-  env.el("color").value = "#ff0044";
+  env.node("p-color").value = "#ff0044";
   const body = env.el("body");
   env.fireWindow("click", { target: body, clientX: 500, clientY: 250 });
   assert.equal(env.fetchCalls.length, 1);
@@ -117,7 +136,8 @@ test("click on body sends effect with 0-100 coords", () => {
   assert.equal(env.fetchCalls[0].opts.method, "POST");
   assert.equal(env.fetchCalls[0].opts.headers["Content-Type"], "application/json");
   assert.deepEqual(JSON.parse(env.fetchCalls[0].opts.body), {
-    effect: "particle", x: 50, y: 50, params: { color: "#ff0044" },
+    effect: "particle", x: 50, y: 50,
+    params: { color: "#ff0044", count: 40, spread: 360, speed: 0.35, duration: 1200 },
   });
 });
 
@@ -149,11 +169,63 @@ test("fx selection changes sent effect", () => {
   const body = env.el("body");
   env.fireWindow("click", { target: body, clientX: 100, clientY: 100 });
   env.el("fx-text")._fire("click");
-  env.el("text").value = "Hi";
+  env.node("p-content").value = "Hi";
   env.fireWindow("click", { target: body, clientX: 200, clientY: 100 });
   assert.equal(env.fetchCalls.length, 2);
   assert.equal(JSON.parse(env.fetchCalls[1].opts.body).effect, "text");
-  assert.deepEqual(JSON.parse(env.fetchCalls[1].opts.body).params, { content: "Hi", color: "" });
+  assert.deepEqual(JSON.parse(env.fetchCalls[1].opts.body).params, {
+    content: "Hi", color: "#ffffff", size: 32, duration: 2000,
+  });
+});
+
+test("params button toggles params panel", () => {
+  const env = makeEnv();
+  const btn = env.el("paramsBtn");
+  const box = env.el("paramsPanel");
+  btn._fire("click");
+  assert.equal(box._classes.has("open"), true);
+  assert.equal(btn._classes.has("active"), true);
+  assert.equal(btn._attrs["aria-expanded"], "true");
+  btn._fire("click");
+  assert.equal(box._classes.has("open"), false);
+  assert.equal(btn._attrs["aria-expanded"], "false");
+});
+
+test("conn button toggles conn panel", () => {
+  const env = makeEnv();
+  const btn = env.el("connBtn");
+  const box = env.el("connPanel");
+  btn._fire("click");
+  assert.equal(box._classes.has("open"), true);
+  assert.equal(btn._attrs["aria-expanded"], "true");
+  btn._fire("click");
+  assert.equal(box._classes.has("open"), false);
+});
+
+test("params fields render per selected effect", () => {
+  const env = makeEnv();
+  const body = env.el("paramsBody");
+  assert.equal(body._children.length, 5);
+  assert.equal(env.node("p-color").value, "#ff0044");
+  assert.equal(env.node("p-count").value, 40);
+  env.el("fx-ripple")._fire("click");
+  assert.equal(body._children.length, 3);
+  assert.equal(env.node("p-maxRadius").value, 200);
+  env.el("fx-firework")._fire("click");
+  assert.equal(body._children.length, 2);
+  assert.equal(env.node("p-count").value, 90);
+});
+
+test("window click sends current input values", () => {
+  const env = makeEnv();
+  const body = env.el("body");
+  env.node("p-count").value = "77";
+  env.node("p-speed").value = "0.9";
+  env.fireWindow("click", { target: body, clientX: 100, clientY: 50 });
+  const params = JSON.parse(env.fetchCalls[0].opts.body).params;
+  assert.equal(params.count, 77);
+  assert.equal(params.speed, 0.9);
+  assert.equal(params.color, "#ff0044");
 });
 
 const pdown = { button: 0, pointerId: 1, preventDefault() {} };

@@ -89,15 +89,79 @@
 
   window.addEventListener("resize", applyFabPos);
 
+  var PARAM_DEFS = {
+    particle: [
+      { key: "color", label: "顏色", type: "color", def: "#ff0044" },
+      { key: "count", label: "數量", type: "number", def: 40, min: 1, max: 400, step: 1 },
+      { key: "spread", label: "散佈(度)", type: "number", def: 360, min: 0, max: 360, step: 5 },
+      { key: "speed", label: "速度", type: "number", def: 0.35, min: 0.05, max: 2, step: 0.05 },
+      { key: "duration", label: "持續(ms)", type: "number", def: 1200, min: 200, max: 8000, step: 100 },
+    ],
+    firework: [
+      { key: "count", label: "數量", type: "number", def: 90, min: 1, max: 400, step: 1 },
+      { key: "duration", label: "持續(ms)", type: "number", def: 1800, min: 200, max: 8000, step: 100 },
+    ],
+    ripple: [
+      { key: "color", label: "顏色", type: "color", def: "#44aaff" },
+      { key: "maxRadius", label: "最大半徑", type: "number", def: 200, min: 20, max: 600, step: 10 },
+      { key: "duration", label: "持續(ms)", type: "number", def: 1200, min: 200, max: 8000, step: 100 },
+    ],
+    text: [
+      { key: "content", label: "文字", type: "text", def: "Hello" },
+      { key: "color", label: "顏色", type: "color", def: "#ffffff" },
+      { key: "size", label: "字級", type: "number", def: 32, min: 8, max: 160, step: 2 },
+      { key: "duration", label: "持續(ms)", type: "number", def: 2000, min: 200, max: 10000, step: 100 },
+    ],
+  };
+
   var selected = "particle";
+  var paramsBody = document.getElementById("paramsBody");
+
+  function renderParams() {
+    paramsBody.innerHTML = "";
+    (PARAM_DEFS[selected] || []).forEach(function (d) {
+      var row = document.createElement("div");
+      row.className = "field";
+      var label = document.createElement("label");
+      label.textContent = d.label;
+      var input = document.createElement("input");
+      input.id = "p-" + d.key;
+      input.type = d.type;
+      input.value = d.def;
+      if (d.type === "number") {
+        input.min = d.min;
+        input.max = d.max;
+        input.step = d.step;
+      }
+      row.appendChild(label);
+      row.appendChild(input);
+      paramsBody.appendChild(row);
+    });
+  }
+
   var buttons = document.querySelectorAll("#fxButtons .fx");
   buttons.forEach(function (btn) {
     btn.addEventListener("click", function () {
       buttons.forEach(function (el) { el.classList.remove("selected"); });
       btn.classList.add("selected");
       selected = btn.getAttribute("data-fx");
+      renderParams();
     });
   });
+
+  function bindToggle(btnId, panelId) {
+    var btn = document.getElementById(btnId);
+    var box = document.getElementById(panelId);
+    btn.addEventListener("click", function () {
+      var open = box.classList.toggle("open");
+      btn.classList.toggle("active", open);
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+      if (open) applyFabPos();
+    });
+  }
+  bindToggle("paramsBtn", "paramsPanel");
+  bindToggle("connBtn", "connPanel");
+  renderParams();
 
   function headers() {
     var h = { "Content-Type": "application/json" };
@@ -106,20 +170,13 @@
   }
 
   function paramsFor() {
-    var color = document.getElementById("color").value;
-    var text = document.getElementById("text").value;
-    switch (selected) {
-      case "particle":
-        return { color: color };
-      case "ripple":
-        return { color: color };
-      case "firework":
-        return {};
-      case "text":
-        return { content: text || "Hello", color: color };
-      default:
-        return {};
-    }
+    var out = {};
+    (PARAM_DEFS[selected] || []).forEach(function (d) {
+      var input = document.getElementById("p-" + d.key);
+      if (!input) return;
+      out[d.key] = d.type === "number" ? Number(input.value) : input.value;
+    });
+    return out;
   }
 
   async function post(path, body) {

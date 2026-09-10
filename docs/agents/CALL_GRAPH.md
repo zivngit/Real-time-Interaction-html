@@ -91,6 +91,8 @@ sequenceDiagram
     participant S as server（server/main.py）
     participant V as viewer（shared/app.js）
 
+    Note over C: 選特效 → renderParams() 渲染該特效之 p-* 參數輸入\nparamsBtn / connBtn → bindToggle()（展開時 applyFabPos()）
+    C->>C: 點擊 → paramsFor() 讀取 p-* 輸入
     C->>S: POST /api/effect {effect, x, y, params}
     S->>S: _check_key → effect 驗證 → _rate_limit → _broadcast
     S-->>V: SSE event: effect
@@ -153,8 +155,18 @@ classDiagram
         +_rate_limit()
         +_broadcast()
     }
+    class Console {
+        +saveCfg()
+        +applyFabPos()
+        +renderParams()
+        +bindToggle(btnId, panelId)
+        +headers()
+        +paramsFor()
+        +post(path, body)
+    }
     Viewer ..> Effects : toPixels / createEffect / stepEffect
     Effects ..> Effect : 建立（particle / firework / ripple / text）
+    Console ..> Server : POST /api/effect / POST /api/clear
     Server ..> Viewer : SSE effect / clear / ping
 ```
 
@@ -164,7 +176,7 @@ classDiagram
 flowchart LR
     TA["tests/test_api.py<br/>pytest＋TestClient（12）"] --> M["server/main.py"]
     TE["tests/test_effects.mjs<br/>node --test（13）"] --> S["shared/effects.js"]
-    TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（11）"] --> K["console/app.js"]
+    TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（15）"] --> K["console/app.js"]
 ```
 
 ## 7. 未完成或未接線節點

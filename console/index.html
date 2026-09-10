@@ -24,13 +24,15 @@
     position: fixed; left: 12px; top: 66px; z-index: 11;
     background: rgba(20, 26, 32, 0.92); color: #dfe7ee;
     border: 1px solid #2c3a46; border-radius: 10px; padding: 12px 14px;
-    width: 260px; box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+    width: 280px; box-shadow: 0 6px 24px rgba(0,0,0,0.4);
     user-select: none;
     opacity: 0; transform: translateY(-6px); pointer-events: none;
     transition: opacity 0.15s ease, transform 0.15s ease;
   }
   #panel.open { opacity: 1; transform: none; pointer-events: auto; }
   #panel h1 { font-size: 13px; margin: 0 0 10px; color: #8fb6d9; letter-spacing: 1px; }
+  .fxGroup { margin-bottom: 8px; }
+  .fxGroupTitle { font-size: 11px; color: #64798a; letter-spacing: 1px; margin-bottom: 4px; }
   .row { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
   .fx {
     flex: 1 1 45%; padding: 7px 4px; font-size: 13px; text-align: center;
@@ -39,16 +41,26 @@
   }
   .fx:hover { border-color: #4d6a86; }
   .fx.selected { background: #2d4a66; border-color: #6ea3d8; color: #fff; }
+  .row .fx:only-child { flex: 1 1 100%; }
+  .actionBtn {
+    flex: 1 1 30%; padding: 7px 4px; font-size: 12px; text-align: center;
+    background: #1b2530; color: #dfe7ee; border: 1px solid #33475a;
+    border-radius: 6px; cursor: pointer;
+  }
+  .actionBtn:hover { border-color: #4d6a86; }
+  .actionBtn.active { background: #2d4a66; border-color: #6ea3d8; color: #fff; }
   #clearBtn {
-    flex: 1 1 100%; padding: 7px; font-size: 13px;
+    flex: 1 1 30%; padding: 7px 4px; font-size: 12px; text-align: center;
     background: #3a2026; color: #ff9b9b; border: 1px solid #6e3a44;
     border-radius: 6px; cursor: pointer;
   }
   #clearBtn:hover { background: #4a2830; }
+  .collapsible { display: none; margin-top: 4px; padding-top: 8px; border-top: 1px solid #2c3a46; }
+  .collapsible.open { display: block; }
   .field { display: flex; align-items: center; gap: 6px; font-size: 12px; margin-bottom: 6px; }
   .field label { width: 52px; color: #8fa6b8; }
   .field input[type="color"] { width: 34px; height: 24px; border: none; background: none; padding: 0; cursor: pointer; }
-  .field input[type="text"] { flex: 1; background: #101820; color: #dfe7ee; border: 1px solid #33475a; border-radius: 4px; padding: 4px 6px; font-size: 12px; }
+  .field input[type="text"], .field input[type="number"] { flex: 1; background: #101820; color: #dfe7ee; border: 1px solid #33475a; border-radius: 4px; padding: 4px 6px; font-size: 12px; }
   .field input[type="url"], .field input[type="password"] { flex: 1; background: #101820; color: #dfe7ee; border: 1px solid #33475a; border-radius: 4px; padding: 4px 6px; font-size: 11px; }
   #hint { font-size: 11px; color: #64798a; margin-top: 8px; line-height: 1.5; }
 </style>
@@ -60,30 +72,46 @@
 </button>
 <div id="panel">
   <h1>控制端 (console)</h1>
-  <div class="row" id="fxButtons">
-    <button class="fx selected" data-fx="particle">粒子爆散</button>
-    <button class="fx" data-fx="ripple">漣漪圈</button>
-    <button class="fx" data-fx="firework">煙火</button>
-    <button class="fx" data-fx="text">浮現文字</button>
-  </div>
-  <div class="field">
-    <label>顏色</label>
-    <input type="color" id="color" value="#ff0044">
-    <label>文字</label>
-    <input type="text" id="text" value="Hello" placeholder="text 特效內容">
+  <div id="fxButtons">
+    <div class="fxGroup">
+      <div class="fxGroupTitle">爆散</div>
+      <div class="row">
+        <button class="fx selected" data-fx="particle">粒子爆散</button>
+        <button class="fx" data-fx="firework">煙火</button>
+      </div>
+    </div>
+    <div class="fxGroup">
+      <div class="fxGroupTitle">漣漪</div>
+      <div class="row">
+        <button class="fx" data-fx="ripple">漣漪圈</button>
+      </div>
+    </div>
+    <div class="fxGroup">
+      <div class="fxGroupTitle">文字</div>
+      <div class="row">
+        <button class="fx" data-fx="text">浮現文字</button>
+      </div>
+    </div>
   </div>
   <div class="row">
+    <button id="paramsBtn" class="actionBtn" aria-expanded="false" aria-controls="paramsPanel">參數</button>
+    <button id="connBtn" class="actionBtn" aria-expanded="false" aria-controls="connPanel">連線設定</button>
     <button id="clearBtn">清屏</button>
   </div>
-  <div class="field">
-    <label>中繼 server</label>
-    <input type="url" id="srvUrl" placeholder="http://localhost:8000">
+  <div id="paramsPanel" class="collapsible">
+    <div id="paramsBody"></div>
   </div>
-  <div class="field">
-    <label>金鑰</label>
-    <input type="password" id="srvKey" placeholder="（可留空）">
+  <div id="connPanel" class="collapsible">
+    <div class="field">
+      <label>中繼 server</label>
+      <input type="url" id="srvUrl" placeholder="http://localhost:8000">
+    </div>
+    <div class="field">
+      <label>金鑰</label>
+      <input type="password" id="srvKey" placeholder="（可留空）">
+    </div>
   </div>
-  <div id="hint">選取特效後，點擊畫面任意位置發送。點擊圓形按鈕可收合/展開面板，按住圓形按鈕拖曳可移動位置。狀態僅記錄於 console。</div>
+  <div id="hint">選取特效後，點擊畫面任意位置發送。［參數］展開目前特效的參數；［連線設定］展開 server 與金鑰設定。點擊圓形按鈕可收合/展開面板，按住圓形按鈕拖曳可移動位置。狀態僅記錄於 console。</div>
 </div>
 <script src="app.js"></script>
 </body>

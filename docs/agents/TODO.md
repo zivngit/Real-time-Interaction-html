@@ -29,6 +29,7 @@
 - [x] console UI：面板改為懸浮按鈕 `#fab`（預設收合，點擊展開/收合，過渡動畫＋aria-expanded；新增 tests/test_console.mjs vm 冒煙測試 7 項）（2026-09-09）
 - [x] console UI：長按 `#fab` 拖曳移動位置（限制視窗內、panel 收合/展開皆跟隨；vm 冒煙測試再增 4 項，共 11 項）（2026-09-09）
 - [x] console UI：拖曳改為按住即啟動（移除 350ms 等待）、panel 跟隨後亦 clamp 於視窗內（含水平）（2026-09-09）
+- [x] console UI：特效分組（爆散／漣漪／文字）＋［參數］按鍵（依目前特效展開參數輸入）＋［連線設定］按鍵（收合 srvUrl/srvKey 至展開面板；vm 冒煙測試再增 4 項，共 15 項）（2026-09-10）
 - [ ] server 斷線重播暫存（最近 N 則）
 - [ ] viewer 狀態回報（POST /api/status）
 - [ ] 多 viewer 負載／效能測試
