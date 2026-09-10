@@ -1,5 +1,7 @@
 # Real-time Interaction html 函式呼叫關係圖
 
+> **圖型不固定**：Agent 繪製前須評估內容性質，選擇最能表達該節的 mermaid 圖型（如 `flowchart`、`classDiagram`、`sequenceDiagram`、`stateDiagram-v2`、`erDiagram`），不得一律使用 flowchart。
+
 ## 模組責任
 
 | 模組 | 主要責任 |
