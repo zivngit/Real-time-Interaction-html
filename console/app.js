@@ -33,11 +33,14 @@
 
   var fab = make("button", "rtx-fab");
   fab.setAttribute("aria-expanded", "false");
+  var uiIcons = window.RTX_UI_ICONS || {};
+  function uiIcon(name) {
+    return uiIcons[name] || "";
+  }
+
   fab.setAttribute("aria-controls", "rtx-panel");
   fab.title = "展開/收合控制台";
-  fab.innerHTML =
-    "<svg class='rtx-icon-open' viewBox='0 0 24 24' aria-hidden='true'><line x1='4' y1='7' x2='20' y2='7'/><line x1='4' y1='12' x2='20' y2='12'/><line x1='4' y1='17' x2='20' y2='17'/><circle cx='9' cy='7' r='2.2'/><circle cx='15' cy='12' r='2.2'/><circle cx='7' cy='17' r='2.2'/></svg>" +
-    "<svg class='rtx-icon-close' viewBox='0 0 24 24' aria-hidden='true'><line x1='6' y1='6' x2='18' y2='18'/><line x1='18' y1='6' x2='6' y2='18'/></svg>";
+  fab.innerHTML = uiIcon("fabOpen") + uiIcon("fabClose");
   root.appendChild(fab);
 
   var panel = make("div", "rtx-panel");
@@ -58,7 +61,7 @@
   paramsBtn.setAttribute("aria-controls", "rtx-params-panel");
   paramsBtn.title = "參數";
   paramsBtn.setAttribute("aria-label", "參數");
-  paramsBtn.innerHTML = "<svg viewBox='0 0 24 24' aria-hidden='true'><line x1='4' y1='8' x2='20' y2='8'/><line x1='4' y1='16' x2='20' y2='16'/><circle cx='9' cy='8' r='2.2'/><circle cx='15' cy='16' r='2.2'/></svg>";
+  paramsBtn.innerHTML = uiIcon("params");
   row.appendChild(paramsBtn);
 
   var connBtn = make("button", "rtx-conn-btn", "rtx-action");
@@ -66,13 +69,13 @@
   connBtn.setAttribute("aria-controls", "rtx-conn-panel");
   connBtn.title = "連線設定";
   connBtn.setAttribute("aria-label", "連線設定");
-  connBtn.innerHTML = "<svg viewBox='0 0 24 24' aria-hidden='true'><rect x='4' y='5' width='16' height='6' rx='1.5'/><rect x='4' y='13' width='16' height='6' rx='1.5'/><circle cx='8' cy='8' r='1'/><circle cx='8' cy='16' r='1'/></svg>";
+  connBtn.innerHTML = uiIcon("conn");
   row.appendChild(connBtn);
 
   var clearBtn = make("button", "rtx-clear-btn");
   clearBtn.title = "清屏";
   clearBtn.setAttribute("aria-label", "清屏");
-  clearBtn.innerHTML = "<svg viewBox='0 0 24 24' aria-hidden='true'><line x1='5' y1='7' x2='19' y2='7'/><line x1='9' y1='7' x2='9' y2='5'/><line x1='15' y1='7' x2='15' y2='5'/><line x1='9' y1='5' x2='15' y2='5'/><line x1='6' y1='7' x2='7' y2='19'/><line x1='18' y1='7' x2='17' y2='19'/><line x1='7' y1='19' x2='17' y2='19'/></svg>";
+  clearBtn.innerHTML = uiIcon("clear");
   row.appendChild(clearBtn);
 
   var paramsPanel = make("div", "rtx-params-panel", "rtx-collapsible");
@@ -230,7 +233,7 @@
   window.addEventListener("resize", applyFabPos);
 
   var FALLBACK_ICON = "<svg viewBox='0 0 24 24' aria-hidden='true'><circle cx='12' cy='12' r='9'/><circle cx='12' cy='12' r='3'/></svg>";
-  var externalIcons = window.RTX_ICONS || {};
+  var externalIcons = window.RTX_EFFECT_ICONS || {};
   function iconFor(type) {
     return externalIcons[type] || externalIcons.generic || FALLBACK_ICON;
   }

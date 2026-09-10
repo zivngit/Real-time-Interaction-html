@@ -171,6 +171,7 @@ classDiagram
         +clampPanelPos(x, y, w, h)
         +overlapArea(a, b)
         +iconFor(type)
+        +uiIcon(name)
         +genericFields(params)
         +fieldDefs(type)
         +renderParams()
@@ -196,7 +197,7 @@ classDiagram
 flowchart LR
     TA["tests/test_api.py<br/>pytest＋TestClient（15）"] --> M["server/main.py"]
     TE["tests/test_effects.mjs<br/>node --test（13）"] --> S["viewer/effects.js"]
-    TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（38）"] --> K["console/app.js"]
+    TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（39）"] --> K["console/app.js"]
 ```
 
 ## 7. 未完成或未接線節點

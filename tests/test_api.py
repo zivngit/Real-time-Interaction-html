@@ -126,7 +126,8 @@ def test_serves_icons_js(client):
     assert r.status_code == 200
     assert "javascript" in r.headers["content-type"]
     assert r.headers["cache-control"] == "no-store"
-    assert "RTX_ICONS" in r.text
+    assert "RTX_EFFECT_ICONS" in r.text
+    assert "RTX_UI_ICONS" in r.text
 
 
 def test_rate_limit(client, monkeypatch):

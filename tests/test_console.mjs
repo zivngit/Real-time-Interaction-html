@@ -287,10 +287,24 @@ test("known effect buttons are not generic", async () => {
 
 test("uses external icons.js for effect icons", async () => {
   const env = await makeEnv();
-  assert.ok(env.win.RTX_ICONS);
-  assert.ok(env.win.RTX_ICONS.particle);
-  assert.ok(env.win.RTX_ICONS.generic);
+  assert.ok(env.win.RTX_EFFECT_ICONS);
+  assert.ok(env.win.RTX_EFFECT_ICONS.particle);
+  assert.ok(env.win.RTX_EFFECT_ICONS.generic);
   assert.ok(env.node("rtx-fx-particle").innerHTML.includes("<svg"));
+});
+
+test("uses external icons.js for console UI icons", async () => {
+  const env = await makeEnv();
+  assert.ok(env.win.RTX_UI_ICONS);
+  assert.ok(env.win.RTX_UI_ICONS.fabOpen);
+  assert.ok(env.win.RTX_UI_ICONS.fabClose);
+  assert.ok(env.win.RTX_UI_ICONS.params);
+  assert.ok(env.win.RTX_UI_ICONS.conn);
+  assert.ok(env.win.RTX_UI_ICONS.clear);
+  assert.ok(env.node("rtx-fab").innerHTML.includes("<svg"));
+  assert.ok(env.node("rtx-params-btn").innerHTML.includes("<svg"));
+  assert.ok(env.node("rtx-conn-btn").innerHTML.includes("<svg"));
+  assert.ok(env.node("rtx-clear-btn").innerHTML.includes("<svg"));
 });
 
 test("unknown effect renders generic button and generic params", async () => {
