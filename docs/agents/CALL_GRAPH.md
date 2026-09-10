@@ -216,7 +216,6 @@ flowchart LR
 | --- | --- |
 | server 暫存最近 N 則（斷線重播） | 未實作（規格：預設不重播） |
 | viewer 狀態回報（POST /api/status） | 未實作（規格：僅 log） |
-| viewer/style.css | 無頁面引用（standalone `viewer/index.html` 已移除，examples 嵌入頁未載入）；檔案暫留 |
 
 執行測試：
 

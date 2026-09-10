@@ -1,5 +1,0 @@
-html, body { margin: 0; height: 100%; background: #05070a; overflow: hidden; }
-#label {
-  position: fixed; left: 10px; bottom: 8px; z-index: 1;
-  font: 11px system-ui, sans-serif; color: #3d4c5c; pointer-events: none;
-}
