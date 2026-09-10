@@ -229,6 +229,8 @@ def test_examples_enabled_when_serve_examples_set(client, monkeypatch):
     assert r.headers["cache-control"] == "no-store"
     for name in ("embed-viewer.html", "embed-console.html", "embed-both.html"):
         assert name in r.text
+    assert "/viewer/index.html" not in r.text
+    assert "/console/index.html" not in r.text
     r = client.get("/examples/embed-viewer.html")
     assert r.status_code == 200
     assert "/app.js" in r.text

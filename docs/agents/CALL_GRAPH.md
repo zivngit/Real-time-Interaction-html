@@ -6,18 +6,19 @@
 
 ```mermaid
 flowchart LR
-    C["console/index.html<br/>console/icons.js + console/app.js + console/style.css"]
+    C["examples/embed-console.html（＋embed-both.html）<br/>console/icons.js + console/app.js + console/style.css"]
     S["server/main.py<br/>server/effects.py（FastAPI）"]
-    V["viewer/index.html<br/>viewer/effects.js + shared/app.js + viewer/style.css"]
-    E["examples/*.html<br/>（opt-in：SERVE_EXAMPLES=1）"]
+    V["examples/embed-viewer.html（＋embed-both.html）<br/>viewer/app.js（Effects 未載入時動態載入 viewer/effects.js）"]
+    E["examples/index.html<br/>（demo／showcase 索引，opt-in：SERVE_EXAMPLES=1）"]
     LS[("localStorage<br/>rtx.srvUrl / rtx.srvKey")]
     C -->|"POST /api/effect、POST /api/clear"| S
     C -->|"GET /api/effects"| S
+    C -->|"GET /console.css、/icons.js、/console.js (no-store)"| S
     S -->|"GET /api/stream<br/>(SSE: effect / clear / ping)"| V
-    S -->|"GET /app.js、/effects.js (no-store)"| V
-    S -->|"GET /icons.js、/console.js、/console.css (no-store)"| C
+    V -->|"GET /app.js、/effects.js (no-store)"| S
     S -->|"GET /examples/*（no-store，opt-in）"| E
-    E -->|"載入 /app.js、/console.css、/icons.js、/console.js"| S
+    E -->|"連結 embed-*.html"| C
+    E -->|"連結 embed-*.html"| V
     LS -.-> C
 ```
 
@@ -100,10 +101,10 @@ sequenceDiagram
     autonumber
     participant C as console（console/app.js）
     participant S as server（server/main.py）
-    participant V as viewer（shared/app.js）
+    participant V as viewer（viewer/app.js）
 
-    Note over C: console/index.html 載入 console/style.css＋console/icons.js＋console/app.js\n嵌入時載入 /console.css＋/icons.js＋/console.js\n初始化 → loadEffects() fetch /api/effects\n成功 → renderEffects() 動態建立特效按鈕（未知特效 generic）\n失敗/空表 → fallback 內建特效\nparamsBtn / connBtn → bindToggle()（展開時 applyFabPos()）\napplyFabPos() → panelCandidates() 選最小重疊位置；FAB z-index 高於 panel
-    Note over V: viewer/index.html 載入 viewer/style.css＋viewer/effects.js＋shared/app.js\n嵌入時 /app.js 若 Effects 未載入會動態載入 /effects.js
+    Note over C: examples/embed-console.html（＋embed-both.html）載入 /console.css＋/icons.js＋/console.js\n初始化 → loadEffects() fetch /api/effects\n成功 → renderEffects() 動態建立特效按鈕（未知特效 generic）\n失敗/空表 → fallback 內建特效\nparamsBtn / connBtn → bindToggle()（展開時 applyFabPos()）\napplyFabPos() → panelCandidates() 選最小重疊位置；FAB z-index 高於 panel
+    Note over V: examples/embed-viewer.html（＋embed-both.html）載入 /app.js\n/app.js 若 Effects 未載入會動態載入 /effects.js
     C->>C: 選特效 → selectEffect() → renderParams()
     C->>C: 點擊 → paramsFor() 讀取 rtx-p-* 輸入
     C->>S: POST /api/effect {effect, x, y, params}
@@ -215,6 +216,7 @@ flowchart LR
 | --- | --- |
 | server 暫存最近 N 則（斷線重播） | 未實作（規格：預設不重播） |
 | viewer 狀態回報（POST /api/status） | 未實作（規格：僅 log） |
+| viewer/style.css | 無頁面引用（standalone `viewer/index.html` 已移除，examples 嵌入頁未載入）；檔案暫留 |
 
 執行測試：
 

@@ -38,6 +38,7 @@
 - [x] console：SVG icons 抽至 `console/icons.js`（server 新增 `GET /icons.js`；console 嵌入需先載入 `/icons.js`）（2026-09-10）
 - [x] console：剩餘 UI SVG 亦移入 `console/icons.js`（以 `RTX_EFFECT_ICONS`／`RTX_UI_ICONS` 區分特效與 console UI icons）（2026-09-10）
 - [x] examples：opt-in 嵌入示範頁（`examples/` 四頁；server 新增 `GET /examples`、`/examples/`、`/examples/{path:path}`，預設 404，`SERVE_EXAMPLES=1` 啟用；tests/test_api.py 新增 2 項）（2026-09-10）
+- [x] examples 改為 demo／showcase 頁：移除 standalone 展示頁 `console/index.html`、`viewer/index.html`；`shared/app.js` 移至 `viewer/app.js`（server `/app.js` 改 serve `viewer/app.js`，`shared/` 目錄移除；`examples/index.html` 不再連結 standalone 頁）（2026-09-10）
 - [ ] server 斷線重播暫存（最近 N 則）
 - [ ] viewer 狀態回報（POST /api/status）
 - [ ] 多 viewer 負載／效能測試

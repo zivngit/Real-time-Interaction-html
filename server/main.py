@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from server.effects import EFFECTS
 
 ROOT = Path(__file__).resolve().parent.parent
-SHARED_APP_JS = ROOT / "shared" / "app.js"
+VIEWER_APP_JS = ROOT / "viewer" / "app.js"
 VIEWER_EFFECTS_JS = ROOT / "viewer" / "effects.js"
 CONSOLE_APP_JS = ROOT / "console" / "app.js"
 CONSOLE_ICONS_JS = ROOT / "console" / "icons.js"
@@ -152,9 +152,9 @@ NO_STORE = {"Cache-Control": "no-store"}
 
 @app.get("/app.js")
 async def app_js():
-    if not SHARED_APP_JS.exists():
-        raise HTTPException(status_code=404, detail="shared/app.js not found")
-    return FileResponse(SHARED_APP_JS, media_type="application/javascript", headers=NO_STORE)
+    if not VIEWER_APP_JS.exists():
+        raise HTTPException(status_code=404, detail="viewer/app.js not found")
+    return FileResponse(VIEWER_APP_JS, media_type="application/javascript", headers=NO_STORE)
 
 
 @app.get("/effects.js")
