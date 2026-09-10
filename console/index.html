@@ -33,27 +33,32 @@
   #panel h1 { font-size: 13px; margin: 0 0 10px; color: #8fb6d9; letter-spacing: 1px; }
   .fxGroup { margin-bottom: 8px; }
   .fxGroupTitle { font-size: 11px; color: #64798a; letter-spacing: 1px; margin-bottom: 4px; }
-  .row { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+  .row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  /* 統一圓形圖示按鈕（參考 #fab）：特效按鈕較大為主視覺，動作按鈕較小次要 */
   .fx {
-    flex: 1 1 45%; padding: 7px 4px; font-size: 13px; text-align: center;
-    background: #1b2530; color: #dfe7ee; border: 1px solid #33475a;
-    border-radius: 6px; cursor: pointer;
+    width: 52px; height: 52px; border-radius: 50%; padding: 0;
+    background: #1b2530; border: 1px solid #33475a;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
   }
-  .fx:hover { border-color: #4d6a86; }
-  .fx.selected { background: #2d4a66; border-color: #6ea3d8; color: #fff; }
-  .row .fx:only-child { flex: 1 1 100%; }
+  .fx svg { width: 26px; height: 26px; stroke: #dfe7ee; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+  .fx:hover { border-color: #4d6a86; background: #22303d; }
+  .fx.selected { background: #2d4a66; border-color: #6ea3d8; }
+  .fx.selected svg { stroke: #fff; }
   .actionBtn {
-    flex: 1 1 30%; padding: 7px 4px; font-size: 12px; text-align: center;
-    background: #1b2530; color: #dfe7ee; border: 1px solid #33475a;
-    border-radius: 6px; cursor: pointer;
+    width: 34px; height: 34px; border-radius: 50%; padding: 0;
+    background: #1b2530; border: 1px solid #33475a;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
   }
-  .actionBtn:hover { border-color: #4d6a86; }
-  .actionBtn.active { background: #2d4a66; border-color: #6ea3d8; color: #fff; }
+  .actionBtn svg { width: 17px; height: 17px; stroke: #9fb4c6; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+  .actionBtn:hover { border-color: #4d6a86; background: #22303d; }
+  .actionBtn.active { background: #2d4a66; border-color: #6ea3d8; }
+  .actionBtn.active svg { stroke: #fff; }
   #clearBtn {
-    flex: 1 1 30%; padding: 7px 4px; font-size: 12px; text-align: center;
-    background: #3a2026; color: #ff9b9b; border: 1px solid #6e3a44;
-    border-radius: 6px; cursor: pointer;
+    width: 34px; height: 34px; border-radius: 50%; padding: 0;
+    background: #3a2026; border: 1px solid #6e3a44;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
   }
+  #clearBtn svg { width: 17px; height: 17px; stroke: #ff9b9b; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; }
   #clearBtn:hover { background: #4a2830; }
   .collapsible { display: none; margin-top: 4px; padding-top: 8px; border-top: 1px solid #2c3a46; }
   .collapsible.open { display: block; }
@@ -72,32 +77,46 @@
 </button>
 <div id="panel">
   <h1>控制端 (console)</h1>
-  <div id="fxButtons">
-    <div class="fxGroup">
-      <div class="fxGroupTitle">爆散</div>
-      <div class="row">
-        <button class="fx selected" data-fx="particle">粒子爆散</button>
-        <button class="fx" data-fx="firework">煙火</button>
+    <div id="fxButtons">
+      <div class="fxGroup">
+        <div class="fxGroupTitle">爆散</div>
+        <div class="row">
+          <button class="fx selected" data-fx="particle" title="粒子爆散" aria-label="粒子爆散">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2.4"/><line x1="12" y1="3" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="3" y1="12" x2="7" y2="12"/><line x1="17" y1="12" x2="21" y2="12"/><line x1="5.6" y1="5.6" x2="8" y2="8"/><line x1="16" y1="16" x2="18.4" y2="18.4"/><line x1="18.4" y1="5.6" x2="16" y2="8"/><line x1="8" y1="16" x2="5.6" y2="18.4"/></svg>
+          </button>
+          <button class="fx" data-fx="firework" title="煙火" aria-label="煙火">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="12" x2="4" y2="6"/><line x1="12" y1="12" x2="20" y2="6"/><line x1="12" y1="12" x2="12" y2="4"/><line x1="12" y1="12" x2="7" y2="5"/><line x1="12" y1="12" x2="17" y2="5"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="fxGroup">
+        <div class="fxGroupTitle">漣漪</div>
+        <div class="row">
+          <button class="fx" data-fx="ripple" title="漣漪圈" aria-label="漣漪圈">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2.5"/><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="10"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="fxGroup">
+        <div class="fxGroupTitle">文字</div>
+        <div class="row">
+          <button class="fx" data-fx="text" title="浮現文字" aria-label="浮現文字">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="5" y1="6" x2="19" y2="6"/><line x1="12" y1="6" x2="12" y2="19"/><line x1="9" y1="19" x2="15" y2="19"/></svg>
+          </button>
+        </div>
       </div>
     </div>
-    <div class="fxGroup">
-      <div class="fxGroupTitle">漣漪</div>
-      <div class="row">
-        <button class="fx" data-fx="ripple">漣漪圈</button>
-      </div>
+    <div class="row">
+      <button id="paramsBtn" class="actionBtn" aria-expanded="false" aria-controls="paramsPanel" title="參數" aria-label="參數">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>
+      </button>
+      <button id="connBtn" class="actionBtn" aria-expanded="false" aria-controls="connPanel" title="連線設定" aria-label="連線設定">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="6" rx="1.5"/><rect x="4" y="13" width="16" height="6" rx="1.5"/><circle cx="8" cy="8" r="1"/><circle cx="8" cy="16" r="1"/></svg>
+      </button>
+      <button id="clearBtn" title="清屏" aria-label="清屏">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="5" y1="7" x2="19" y2="7"/><line x1="9" y1="7" x2="9" y2="5"/><line x1="15" y1="7" x2="15" y2="5"/><line x1="9" y1="5" x2="15" y2="5"/><line x1="6" y1="7" x2="7" y2="19"/><line x1="18" y1="7" x2="17" y2="19"/><line x1="7" y1="19" x2="17" y2="19"/></svg>
+      </button>
     </div>
-    <div class="fxGroup">
-      <div class="fxGroupTitle">文字</div>
-      <div class="row">
-        <button class="fx" data-fx="text">浮現文字</button>
-      </div>
-    </div>
-  </div>
-  <div class="row">
-    <button id="paramsBtn" class="actionBtn" aria-expanded="false" aria-controls="paramsPanel">參數</button>
-    <button id="connBtn" class="actionBtn" aria-expanded="false" aria-controls="connPanel">連線設定</button>
-    <button id="clearBtn">清屏</button>
-  </div>
   <div id="paramsPanel" class="collapsible">
     <div id="paramsBody"></div>
   </div>
@@ -111,7 +130,7 @@
       <input type="password" id="srvKey" placeholder="（可留空）">
     </div>
   </div>
-  <div id="hint">選取特效後，點擊畫面任意位置發送。［參數］展開目前特效的參數；［連線設定］展開 server 與金鑰設定。點擊圓形按鈕可收合/展開面板，按住圓形按鈕拖曳可移動位置。狀態僅記錄於 console。</div>
+  <div id="hint">選取特效後，點擊畫面任意位置發送。懸停圓形按鈕會顯示名稱為提示；［參數］展開目前特效參數，［連線設定］展開 server 與金鑰設定。點擊左上圓形按鈕可收合/展開面板，按住拖曳可移動位置。狀態僅記錄於 console。</div>
 </div>
 <script src="app.js"></script>
 </body>
