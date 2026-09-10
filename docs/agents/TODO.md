@@ -34,6 +34,7 @@
 - [x] console：server 特效表動態建立按鈕（`GET /api/effects`；未知特效使用通用樣式與參數；載入失敗時 fallback 至內建特效；vm 測試擴充至 34 項）（2026-09-10）
 - [x] console：可嵌入其他網頁（self-contained、scoped style、unique IDs、double-load guard；server 新增 `GET /console.js`；支援 `window.CONTROL_CONFIG`／script origin／`data-key`／localStorage 設定優先序）（2026-09-10）
 - [x] console UI：FAB 永遠在面板上層；面板跟隨 FAB 並以 below/above/left/right 候選位置避免重疊（除非視窗太小；vm 測試再增 3 項，共 37 項）（2026-09-10）
+- [x] console/server/viewer：分離 JS/CSS；console 樣式抽至 `console/style.css`、viewer 樣式抽至 `viewer/style.css`；特效實作移至 `viewer/effects.js`；server 特效列表抽至 `server/effects.py`（2026-09-10）
 - [ ] server 斷線重播暫存（最近 N 則）
 - [ ] viewer 狀態回報（POST /api/status）
 - [ ] 多 viewer 負載／效能測試

@@ -7,6 +7,7 @@ import vm from "node:vm";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const src = readFileSync(join(root, "console", "app.js"), "utf8");
+const css = readFileSync(join(root, "console", "style.css"), "utf8");
 
 const DEFAULT_EFFECTS = {
   particle: {
@@ -225,11 +226,10 @@ function overlapArea(a, b) {
   return x * y;
 }
 
-test("injects scoped style and unique ids", async () => {
+test("uses external scoped style and unique ids", async () => {
   const env = await makeEnv();
-  const style = env.node("rtx-console-style");
-  assert.ok(style);
-  assert.ok(style.textContent.includes("#rtx-console { display: contents; }"));
+  assert.ok(css.includes("#rtx-console { display: contents; }"));
+  assert.equal(env.node("rtx-console-style"), null);
   assert.equal(env.node("rtx-console")._parent, env.body);
   for (const id of [
     "rtx-fab",
@@ -609,8 +609,6 @@ test("drag clamps fab and panel inside viewport", async () => {
 });
 
 test("fab renders above panel in scoped style", async () => {
-  const env = await makeEnv();
-  const css = env.node("rtx-console-style").textContent;
   const fabMatch = css.match(/#rtx-fab \{[^}]*z-index: (\d+);/);
   const panelMatch = css.match(/#rtx-panel \{[^}]*z-index: (\d+);/);
   assert.ok(fabMatch);

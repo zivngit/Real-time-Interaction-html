@@ -113,6 +113,14 @@ def test_serves_console_js(client):
     assert "rtx-console" in r.text
 
 
+def test_serves_console_css(client):
+    r = client.get("/console.css")
+    assert r.status_code == 200
+    assert "css" in r.headers["content-type"]
+    assert r.headers["cache-control"] == "no-store"
+    assert "#rtx-fab" in r.text
+
+
 def test_rate_limit(client, monkeypatch):
     monkeypatch.setattr(m, "RATE_LIMIT_PER_SEC", 3)
     m._rate_window.clear()

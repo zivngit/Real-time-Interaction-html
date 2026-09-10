@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import Effects from "../shared/effects.js";
+import Effects from "../viewer/effects.js";
 
 const { EFFECTS, createEffect, toPixels, toPercent, clamp } = Effects;
 

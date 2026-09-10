@@ -11,31 +11,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from server.effects import EFFECTS
+
 ROOT = Path(__file__).resolve().parent.parent
 SHARED_APP_JS = ROOT / "shared" / "app.js"
-SHARED_EFFECTS_JS = ROOT / "shared" / "effects.js"
+VIEWER_EFFECTS_JS = ROOT / "viewer" / "effects.js"
 CONSOLE_APP_JS = ROOT / "console" / "app.js"
+CONSOLE_CSS = ROOT / "console" / "style.css"
 
 ACCESS_KEY = os.getenv("ACCESS_KEY", "").strip()
-
-EFFECTS = {
-    "particle": {
-        "name": "粒子爆散",
-        "params": {"color": "#ff0044", "count": 40, "spread": 360, "speed": 0.35, "duration": 1200},
-    },
-    "ripple": {
-        "name": "漣漪圈",
-        "params": {"color": "#44aaff", "maxRadius": 200, "duration": 1200},
-    },
-    "firework": {
-        "name": "煙火",
-        "params": {"colors": ["#ff5252", "#ffd740", "#40c4ff", "#69f0ae"], "count": 90, "duration": 1800},
-    },
-    "text": {
-        "name": "浮現文字",
-        "params": {"content": "Hello", "size": 32, "duration": 2000, "color": "#ffffff"},
-    },
-}
 
 RATE_LIMIT_PER_SEC = 20
 
@@ -173,9 +157,9 @@ async def app_js():
 
 @app.get("/effects.js")
 async def effects_js():
-    if not SHARED_EFFECTS_JS.exists():
-        raise HTTPException(status_code=404, detail="shared/effects.js not found")
-    return FileResponse(SHARED_EFFECTS_JS, media_type="application/javascript", headers=NO_STORE)
+    if not VIEWER_EFFECTS_JS.exists():
+        raise HTTPException(status_code=404, detail="viewer/effects.js not found")
+    return FileResponse(VIEWER_EFFECTS_JS, media_type="application/javascript", headers=NO_STORE)
 
 
 @app.get("/console.js")
@@ -183,3 +167,10 @@ async def console_js():
     if not CONSOLE_APP_JS.exists():
         raise HTTPException(status_code=404, detail="console/app.js not found")
     return FileResponse(CONSOLE_APP_JS, media_type="application/javascript", headers=NO_STORE)
+
+
+@app.get("/console.css")
+async def console_css():
+    if not CONSOLE_CSS.exists():
+        raise HTTPException(status_code=404, detail="console/style.css not found")
+    return FileResponse(CONSOLE_CSS, media_type="text/css", headers=NO_STORE)

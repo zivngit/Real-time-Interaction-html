@@ -21,48 +21,6 @@
   var srvUrl = String(cfg.url || origin || storedUrl || "http://localhost:8000").replace(/\/+$/, "");
   var srvKey = String(cfg.key || scriptKey || storedKey || "");
 
-  var CSS = [
-    "#rtx-console { display: contents; }",
-    "#rtx-fab { position: fixed; left: 12px; top: 12px; z-index: 2147483647; width: 44px; height: 44px; border-radius: 50%; background: #2d4a66; border: 1px solid #6ea3d8; box-shadow: 0 4px 16px rgba(0,0,0,0.45); cursor: grab; display: flex; align-items: center; justify-content: center; padding: 0; touch-action: none; }",
-    "#rtx-fab:hover { background: #35597a; }",
-    "#rtx-fab.dragging { cursor: grabbing; }",
-    "#rtx-fab svg { width: 20px; height: 20px; stroke: #fff; stroke-width: 2; stroke-linecap: round; fill: none; }",
-    "#rtx-fab .rtx-icon-close { display: none; }",
-    "#rtx-fab.active .rtx-icon-open { display: none; }",
-    "#rtx-fab.active .rtx-icon-close { display: block; }",
-    "#rtx-panel { position: fixed; left: 12px; top: 66px; z-index: 2147483646; background: rgba(20, 26, 32, 0.92); color: #dfe7ee; border: 1px solid #2c3a46; border-radius: 10px; padding: 12px 14px; width: 280px; box-shadow: 0 6px 24px rgba(0,0,0,0.4); user-select: none; opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity 0.15s ease, transform 0.15s ease; }",
-    "#rtx-panel.open { opacity: 1; transform: none; pointer-events: auto; }",
-    "#rtx-panel h1 { font-size: 13px; margin: 0 0 10px; color: #8fb6d9; letter-spacing: 1px; }",
-    ".rtx-row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }",
-    ".rtx-fx { width: 52px; height: 52px; border-radius: 50%; padding: 0; background: #1b2530; border: 1px solid #33475a; display: flex; align-items: center; justify-content: center; cursor: pointer; }",
-    ".rtx-fx svg { width: 26px; height: 26px; stroke: #dfe7ee; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; }",
-    ".rtx-fx:hover { border-color: #4d6a86; background: #22303d; }",
-    ".rtx-fx.selected { background: #2d4a66; border-color: #6ea3d8; }",
-    ".rtx-fx.selected svg { stroke: #fff; }",
-    ".rtx-fx.generic { border-style: dashed; }",
-    ".rtx-action { width: 34px; height: 34px; border-radius: 50%; padding: 0; background: #1b2530; border: 1px solid #33475a; display: flex; align-items: center; justify-content: center; cursor: pointer; }",
-    ".rtx-action svg { width: 17px; height: 17px; stroke: #9fb4c6; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; }",
-    ".rtx-action:hover { border-color: #4d6a86; background: #22303d; }",
-    ".rtx-action.active { background: #2d4a66; border-color: #6ea3d8; }",
-    ".rtx-action.active svg { stroke: #fff; }",
-    "#rtx-clear-btn { width: 34px; height: 34px; border-radius: 50%; padding: 0; background: #3a2026; border: 1px solid #6e3a44; display: flex; align-items: center; justify-content: center; cursor: pointer; }",
-    "#rtx-clear-btn svg { width: 17px; height: 17px; stroke: #ff9b9b; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; }",
-    "#rtx-clear-btn:hover { background: #4a2830; }",
-    ".rtx-collapsible { display: none; margin-top: 4px; padding-top: 8px; border-top: 1px solid #2c3a46; }",
-    ".rtx-collapsible.open { display: block; }",
-    ".rtx-field { display: flex; align-items: center; gap: 6px; font-size: 12px; margin-bottom: 6px; }",
-    ".rtx-field label { width: 52px; color: #8fa6b8; }",
-    ".rtx-field input[type='color'] { width: 34px; height: 24px; border: none; background: none; padding: 0; cursor: pointer; }",
-    ".rtx-field input[type='text'], .rtx-field input[type='number'] { flex: 1; background: #101820; color: #dfe7ee; border: 1px solid #33475a; border-radius: 4px; padding: 4px 6px; font-size: 12px; }",
-    ".rtx-field input[type='url'], .rtx-field input[type='password'] { flex: 1; background: #101820; color: #dfe7ee; border: 1px solid #33475a; border-radius: 4px; padding: 4px 6px; font-size: 11px; }",
-    "#rtx-hint { font-size: 11px; color: #64798a; margin-top: 8px; line-height: 1.5; }"
-  ].join("\n");
-
-  var style = document.createElement("style");
-  style.id = "rtx-console-style";
-  style.textContent = CSS;
-  (document.head || document.body).appendChild(style);
-
   function make(tag, id, className) {
     var n = document.createElement(tag);
     if (id) n.id = id;

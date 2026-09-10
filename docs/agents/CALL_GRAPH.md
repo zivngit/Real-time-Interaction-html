@@ -6,15 +6,15 @@
 
 ```mermaid
 flowchart LR
-    C["console/index.html<br/>console/app.js"]
-    S["server/main.py<br/>(FastAPI)"]
-    V["viewer/index.html<br/>shared/app.js + shared/effects.js"]
+    C["console/index.html<br/>console/app.js + console/style.css"]
+    S["server/main.py<br/>server/effects.py（FastAPI）"]
+    V["viewer/index.html<br/>viewer/effects.js + shared/app.js + viewer/style.css"]
     LS[("localStorage<br/>rtx.srvUrl / rtx.srvKey")]
     C -->|"POST /api/effect、POST /api/clear"| S
     C -->|"GET /api/effects"| S
     S -->|"GET /api/stream<br/>(SSE: effect / clear / ping)"| V
     S -->|"GET /app.js、/effects.js (no-store)"| V
-    S -->|"GET /console.js (no-store)"| C
+    S -->|"GET /console.js、/console.css (no-store)"| C
     LS -.-> C
 ```
 
@@ -31,7 +31,7 @@ flowchart TD
         ST["GET /api/stream"]
         H["GET /health"]
         LE["GET /api/effects"]
-        JS["GET /app.js / /effects.js / /console.js"]
+        JS["GET /app.js / /effects.js / /console.js / /console.css"]
     end
 
     subgraph guard["驗證"]
@@ -93,7 +93,8 @@ sequenceDiagram
     participant S as server（server/main.py）
     participant V as viewer（shared/app.js）
 
-    Note over C: 初始化 → loadEffects() fetch /api/effects\n成功 → renderEffects() 動態建立特效按鈕（未知特效 generic）\n失敗/空表 → fallback 內建特效\nparamsBtn / connBtn → bindToggle()（展開時 applyFabPos()）\napplyFabPos() → panelCandidates() 選最小重疊位置；FAB z-index 高於 panel
+    Note over C: console/index.html 載入 console/style.css＋console/app.js\n嵌入時載入 /console.css＋/console.js\n初始化 → loadEffects() fetch /api/effects\n成功 → renderEffects() 動態建立特效按鈕（未知特效 generic）\n失敗/空表 → fallback 內建特效\nparamsBtn / connBtn → bindToggle()（展開時 applyFabPos()）\napplyFabPos() → panelCandidates() 選最小重疊位置；FAB z-index 高於 panel
+    Note over V: viewer/index.html 載入 viewer/style.css＋viewer/effects.js＋shared/app.js\n嵌入時 /app.js 若 Effects 未載入會動態載入 /effects.js
     C->>C: 選特效 → selectEffect() → renderParams()
     C->>C: 點擊 → paramsFor() 讀取 rtx-p-* 輸入
     C->>S: POST /api/effect {effect, x, y, params}
@@ -150,6 +151,10 @@ classDiagram
         +clearAll()
         +handleEffect(msg)
     }
+    class EffectCatalog {
+        <<server/effects.py>>
+        +EFFECTS
+    }
     class Server {
         +post_effect()
         +post_clear()
@@ -180,6 +185,7 @@ classDiagram
     Viewer ..> Effects : toPixels / createEffect / stepEffect
     Effects ..> Effect : 建立（particle / firework / ripple / text）
     Console ..> Server : POST /api/effect / POST /api/clear
+    Server ..> EffectCatalog : 讀取 EFFECTS
     Server ..> Viewer : SSE effect / clear / ping
 ```
 
@@ -187,8 +193,8 @@ classDiagram
 
 ```mermaid
 flowchart LR
-    TA["tests/test_api.py<br/>pytest＋TestClient（13）"] --> M["server/main.py"]
-    TE["tests/test_effects.mjs<br/>node --test（13）"] --> S["shared/effects.js"]
+    TA["tests/test_api.py<br/>pytest＋TestClient（14）"] --> M["server/main.py"]
+    TE["tests/test_effects.mjs<br/>node --test（13）"] --> S["viewer/effects.js"]
     TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（37）"] --> K["console/app.js"]
 ```
 
