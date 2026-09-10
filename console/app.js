@@ -30,7 +30,7 @@
     "#rtx-fab .rtx-icon-close { display: none; }",
     "#rtx-fab.active .rtx-icon-open { display: none; }",
     "#rtx-fab.active .rtx-icon-close { display: block; }",
-    "#rtx-panel { position: fixed; left: 12px; top: 66px; z-index: 2147483647; background: rgba(20, 26, 32, 0.92); color: #dfe7ee; border: 1px solid #2c3a46; border-radius: 10px; padding: 12px 14px; width: 280px; box-shadow: 0 6px 24px rgba(0,0,0,0.4); user-select: none; opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity 0.15s ease, transform 0.15s ease; }",
+    "#rtx-panel { position: fixed; left: 12px; top: 66px; z-index: 2147483646; background: rgba(20, 26, 32, 0.92); color: #dfe7ee; border: 1px solid #2c3a46; border-radius: 10px; padding: 12px 14px; width: 280px; box-shadow: 0 6px 24px rgba(0,0,0,0.4); user-select: none; opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity 0.15s ease, transform 0.15s ease; }",
     "#rtx-panel.open { opacity: 1; transform: none; pointer-events: auto; }",
     "#rtx-panel h1 { font-size: 13px; margin: 0 0 10px; color: #8fb6d9; letter-spacing: 1px; }",
     ".rtx-row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }",
@@ -170,23 +170,67 @@
 
   var DRAG_SLOP_PX = 8;
   var FAB_SIZE = 44;
-  var FAB_GAP = 54;
+  var GAP = 10;
+  var VIEWPORT_MARGIN = 8;
+  var PANEL_FALLBACK_WIDTH = 280;
+  var PANEL_FALLBACK_HEIGHT = 200;
   var fabPos = { x: 12, y: 12 };
   var drag = null;
 
+  function clampValue(v, min, max) {
+    if (max < min) max = min;
+    return Math.max(min, Math.min(v, max));
+  }
+
+  function overlapArea(a, b) {
+    var x = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x));
+    var y = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+    return x * y;
+  }
+
+  function panelSize() {
+    return { w: panel.offsetWidth || PANEL_FALLBACK_WIDTH, h: panel.offsetHeight || PANEL_FALLBACK_HEIGHT };
+  }
+
+  function clampPanelPos(x, y, w, h) {
+    var maxX = window.innerWidth - w - VIEWPORT_MARGIN;
+    var maxY = window.innerHeight - h - VIEWPORT_MARGIN;
+    return {
+      x: clampValue(x, VIEWPORT_MARGIN, Math.max(VIEWPORT_MARGIN, maxX)),
+      y: clampValue(y, VIEWPORT_MARGIN, Math.max(VIEWPORT_MARGIN, maxY)),
+    };
+  }
+
+  function panelCandidates() {
+    var size = panelSize();
+    var fabRect = { x: fabPos.x, y: fabPos.y, w: FAB_SIZE, h: FAB_SIZE };
+    var raw = [
+      { x: fabPos.x, y: fabPos.y + FAB_SIZE + GAP },
+      { x: fabPos.x, y: fabPos.y - GAP - size.h },
+      { x: fabPos.x + FAB_SIZE + GAP, y: fabPos.y },
+      { x: fabPos.x - size.w - GAP, y: fabPos.y },
+    ];
+    var out = [];
+    raw.forEach(function (c) {
+      var pos = clampPanelPos(c.x, c.y, size.w, size.h);
+      var rect = { x: pos.x, y: pos.y, w: size.w, h: size.h };
+      out.push({ x: rect.x, y: rect.y, area: overlapArea(fabRect, rect) });
+    });
+    return out;
+  }
+
   function applyFabPos() {
-    fabPos.x = Math.max(0, Math.min(fabPos.x, window.innerWidth - FAB_SIZE));
-    fabPos.y = Math.max(0, Math.min(fabPos.y, window.innerHeight - FAB_SIZE));
+    fabPos.x = clampValue(fabPos.x, 0, Math.max(0, window.innerWidth - FAB_SIZE));
+    fabPos.y = clampValue(fabPos.y, 0, Math.max(0, window.innerHeight - FAB_SIZE));
     fab.style.left = fabPos.x + "px";
     fab.style.top = fabPos.y + "px";
-    var pw = panel.offsetWidth || 0;
-    var ph = panel.offsetHeight || 0;
-    var pLeft = Math.max(8, Math.min(fabPos.x, window.innerWidth - pw - 8));
-    var pTop = fabPos.y + FAB_GAP;
-    if (pTop + ph > window.innerHeight - 8) pTop = fabPos.y - ph - 10;
-    pTop = Math.max(8, Math.min(pTop, window.innerHeight - ph - 8));
-    panel.style.left = pLeft + "px";
-    panel.style.top = pTop + "px";
+    var candidates = panelCandidates();
+    var best = candidates[0];
+    for (var i = 1; i < candidates.length; i += 1) {
+      if (candidates[i].area < best.area) best = candidates[i];
+    }
+    panel.style.left = best.x + "px";
+    panel.style.top = best.y + "px";
   }
 
   fab.addEventListener("pointerdown", function (e) {
@@ -376,6 +420,7 @@
   }
 
   renderEffects(FALLBACK_EFFECTS);
+  applyFabPos();
   window.__rtxConsoleReady = loadEffects();
 
   function bindToggle(btn, box) {

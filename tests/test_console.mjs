@@ -215,6 +215,16 @@ function bodyClick(env, x, y) {
   env.fireWindow("click", { target: env.body, clientX: x, clientY: y });
 }
 
+function parsePx(v) {
+  return Number(String(v).replace("px", ""));
+}
+
+function overlapArea(a, b) {
+  const x = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x));
+  const y = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+  return x * y;
+}
+
 test("injects scoped style and unique ids", async () => {
   const env = await makeEnv();
   const style = env.node("rtx-console-style");
@@ -577,7 +587,8 @@ test("movement under slop does not start drag", async () => {
   fab._fire("pointerdown", { clientX: 30, clientY: 30, ...pdown });
   env.fireWindow("pointermove", { clientX: 34, clientY: 30, preventDefault() {} });
   env.fireWindow("pointerup", {});
-  assert.equal(fab.style.left, undefined);
+  assert.equal(fab.style.left, "12px");
+  assert.equal(fab.style.top, "12px");
   fab._fire("click");
   assert.equal(env.node("rtx-panel").classList.contains("open"), true);
 });
@@ -594,5 +605,46 @@ test("drag clamps fab and panel inside viewport", async () => {
   assert.equal(fab.style.top, "456px");
   assert.equal(panel.style.left, "712px");
   assert.equal(panel.style.top, "46px");
+  env.fireWindow("pointerup", {});
+});
+
+test("fab renders above panel in scoped style", async () => {
+  const env = await makeEnv();
+  const css = env.node("rtx-console-style").textContent;
+  const fabMatch = css.match(/#rtx-fab \{[^}]*z-index: (\d+);/);
+  const panelMatch = css.match(/#rtx-panel \{[^}]*z-index: (\d+);/);
+  assert.ok(fabMatch);
+  assert.ok(panelMatch);
+  assert.ok(Number(fabMatch[1]) > Number(panelMatch[1]));
+});
+
+test("panel prefers below when there is room", async () => {
+  const env = await makeEnv();
+  const fab = env.node("rtx-fab");
+  const panel = env.node("rtx-panel");
+  fab._fire("pointerdown", { clientX: 34, clientY: 34, ...pdown });
+  env.fireWindow("pointermove", { clientX: 334, clientY: 146, preventDefault() {} });
+  assert.equal(fab.style.left, "312px");
+  assert.equal(fab.style.top, "124px");
+  assert.equal(panel.style.left, "312px");
+  assert.equal(panel.style.top, "178px");
+  env.fireWindow("pointerup", {});
+});
+
+test("panel avoids fab by moving above when below has no room", async () => {
+  const env = await makeEnv();
+  const fab = env.node("rtx-fab");
+  const panel = env.node("rtx-panel");
+  panel.offsetWidth = 280;
+  panel.offsetHeight = 400;
+  fab._fire("pointerdown", { clientX: 34, clientY: 34, ...pdown });
+  env.fireWindow("pointermove", { clientX: 466, clientY: 450, preventDefault() {} });
+  assert.equal(fab.style.left, "444px");
+  assert.equal(fab.style.top, "428px");
+  assert.equal(panel.style.left, "444px");
+  assert.equal(panel.style.top, "18px");
+  const fabRect = { x: parsePx(fab.style.left), y: parsePx(fab.style.top), w: 44, h: 44 };
+  const panelRect = { x: parsePx(panel.style.left), y: parsePx(panel.style.top), w: 280, h: 400 };
+  assert.equal(overlapArea(fabRect, panelRect), 0);
   env.fireWindow("pointerup", {});
 });

@@ -93,7 +93,7 @@ sequenceDiagram
     participant S as server（server/main.py）
     participant V as viewer（shared/app.js）
 
-    Note over C: 初始化 → loadEffects() fetch /api/effects\n成功 → renderEffects() 動態建立特效按鈕（未知特效 generic）\n失敗/空表 → fallback 內建特效\nparamsBtn / connBtn → bindToggle()（展開時 applyFabPos()）
+    Note over C: 初始化 → loadEffects() fetch /api/effects\n成功 → renderEffects() 動態建立特效按鈕（未知特效 generic）\n失敗/空表 → fallback 內建特效\nparamsBtn / connBtn → bindToggle()（展開時 applyFabPos()）\napplyFabPos() → panelCandidates() 選最小重疊位置；FAB z-index 高於 panel
     C->>C: 選特效 → selectEffect() → renderParams()
     C->>C: 點擊 → paramsFor() 讀取 rtx-p-* 輸入
     C->>S: POST /api/effect {effect, x, y, params}
@@ -161,6 +161,10 @@ classDiagram
     class Console {
         +saveCfg()
         +applyFabPos()
+        +panelCandidates()
+        +panelSize()
+        +clampPanelPos(x, y, w, h)
+        +overlapArea(a, b)
         +genericFields(params)
         +fieldDefs(type)
         +renderParams()
@@ -185,7 +189,7 @@ classDiagram
 flowchart LR
     TA["tests/test_api.py<br/>pytest＋TestClient（13）"] --> M["server/main.py"]
     TE["tests/test_effects.mjs<br/>node --test（13）"] --> S["shared/effects.js"]
-    TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（34）"] --> K["console/app.js"]
+    TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（37）"] --> K["console/app.js"]
 ```
 
 ## 7. 未完成或未接線節點
