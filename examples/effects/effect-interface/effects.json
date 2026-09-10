@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "effects": {
+    "effect-interface": {
+      "viewer": "viewer.js",
+      "console": "console.js",
+      "params": {
+        "duration": {
+          "type": "integer",
+          "default": 1000
+        }
+      }
+    }
+  }
+}

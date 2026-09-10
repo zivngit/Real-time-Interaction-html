@@ -12,7 +12,7 @@
 
 - SSE 斷線期間特效遺失（規格：不重播）
 - 限頻為全域滑動視窗（未區分客戶端）
-- 前端（console/viewer）無瀏覽器自動化測試；console 有 node vm 冒煙測試（tests/test_console.mjs，45 項），viewer 有 node vm 冒煙測試（tests/test_effects.mjs，17 項）
+- 前端（console/viewer）無瀏覽器自動化測試；console 有 node vm 冒煙測試（tests/test_console.mjs，51 項），viewer 有 node vm 冒煙測試（tests/test_effects.mjs，17 項），特效範例有 node vm 冒煙測試（tests/test_effect_examples.mjs，16 項）
 
 ## 第一階段：建立可維護的執行基礎
 
@@ -42,6 +42,9 @@
 - [x] viewer：移除無頁面引用的 `viewer/style.css`（standalone viewer 頁與 examples 嵌入頁皆不再使用）（2026-09-10）
 - [x] server API：embed asset routes 改名為 namespaced paths（`/viewer/app.js`、`/viewer/effects.js`、`/console/app.js`、`/console/icons.js`、`/console/style.css`；舊根路徑 asset routes 回 404）；429 回應加 `Retry-After: 1`，SSE 不再手動發送 `Connection: keep-alive`（2026-09-10）
 - [x] effects：manifest 驅動架構（`effects/effects.json` 為唯一清單；`effects/<id>/viewer.js` 註冊 `window.Effects`、選用 `effects/<id>/console.js` 註冊 `window.RTX_EFFECT_CONSOLE`；server 新增 `GET /api/effects` 清洗 schema、`POST /api/effect` 依 schema 驗證 params（無效值回退預設）、靜態路由 `/effects/effects.json`、`/effects/{id}/viewer.js`、`/effects/{id}/console.js`（path traversal 防護、no-store）；viewer/app.js 載入 `/api/effects` 後動態載入各 viewer.js；console/app.js 改 schema 驅動渲染＋選用 console 插件（失敗回退 schema）；tests/test_api.py 33 項、tests/test_effects.mjs 17 項、tests/test_console.mjs 45 項）（2026-09-10）
+- [x] effects：新增特效指南與範例（`docs/HOW_TO_ADD_EFFECT.md`；`examples/effects/sample-burst/` 完整範例展示全部 manifest 欄位與 params 型別、`examples/effects/effect-interface/` 最小介面參考；兩者非正式 server manifest；tests/test_effect_examples.mjs 16 項）（2026-09-10）
+- [x] console：console 插件 `icon` 支援 raw SVG 字串／icon key 優先解析（優先於 manifest `icon`；raw SVG 按鈕不標記 `generic`；manifest `icon` 仍為 icon key；範例 sample-burst／effect-interface 改為 raw SVG icon 示範；tests/test_console.mjs 再增 4 項，共 49 項）（2026-09-10）
+- [x] console：console 插件 icon 改為 `iconID`／`iconSVG` 兩個欄位（解析優先序 plugin `iconSVG` → plugin `iconID` → manifest `icon` → `RTX_EFFECT_ICONS[type]` → `RTX_EFFECT_ICONS.generic` → 內建 fallback icon；有效 `iconSVG`／`iconID` 優先於 manifest `icon` 且不標記 `generic`；舊 `icon` 欄位不再讀取；particle／ripple／text 改用 `iconID`，sample-burst 示範 `iconID`＋`iconSVG` 且 render 改依 `api.fields` 迭代、effect-interface 只示範 `iconSVG` 且 render 建立 `rtx-p-duration`；HOW_TO_ADD_EFFECT.md 第 8 節改寫為 `iconID`／`iconSVG` 並新增 8.1 server params 傳遞說明（`paramsFor()`、`rtx-p-<key>` id、各型別輸入項與送 server 行為）；tests/test_console.mjs 再增 2 項，共 51 項）（2026-09-10）
 - [ ] server 斷線重播暫存（最近 N 則）
 - [ ] viewer 狀態回報（POST /api/status）
 - [ ] 多 viewer 負載／效能測試

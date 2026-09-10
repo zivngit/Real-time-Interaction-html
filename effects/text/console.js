@@ -4,7 +4,7 @@
   if (typeof window === "undefined" || !window.RTX_EFFECT_CONSOLE) return;
 
   window.RTX_EFFECT_CONSOLE.register("text", {
-    icon: "text",
+    iconID: "text",
     render: function (container, api) {
       var fields = [
         { key: "content", label: "文字", type: "text", maxLength: 20 },

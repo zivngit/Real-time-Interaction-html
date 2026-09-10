@@ -112,7 +112,7 @@ sequenceDiagram
     participant S as server（server/main.py）
     participant V as viewer（viewer/app.js）
 
-    Note over C: examples/embed-console.html（＋embed-both.html）載入 /console/style.css＋/console/icons.js＋/console/app.js\n初始化 → loadEffects() fetch /api/effects\n成功 → loadConsolePlugins()（依 consoleUrl 動態載入 /effects/{id}/console.js，失敗僅 log 回退）→ renderEffects() 動態建立特效按鈕（未知特效 generic）\n失敗/空表 → fallback 內建特效\nrenderParams()：已註冊 console 插件優先 plugin.render()，否則依 schema 渲染（editable:false 與 array 不顯示）\nparamsBtn / connBtn → bindToggle()（展開時 applyFabPos()）\napplyFabPos() → panelCandidates() 選最小重疊位置；FAB z-index 高於 panel
+    Note over C: examples/embed-console.html（＋embed-both.html）載入 /console/style.css＋/console/icons.js＋/console/app.js\n初始化 → loadEffects() fetch /api/effects\n成功 → loadConsolePlugins()（依 consoleUrl 動態載入 /effects/{id}/console.js，失敗僅 log 回退）→ renderEffects() 動態建立特效按鈕（icon 優先序：插件 iconSVG → 插件 iconID → manifest icon → RTX_EFFECT_ICONS[type] → generic → fallback；未知特效 generic）\n失敗/空表 → fallback 內建特效\nrenderParams()：已註冊 console 插件優先 plugin.render()，否則依 schema 渲染（editable:false 與 array 不顯示）\nparamsBtn / connBtn → bindToggle()（展開時 applyFabPos()）\napplyFabPos() → panelCandidates() 選最小重疊位置；FAB z-index 高於 panel
     Note over V: examples/embed-viewer.html（＋embed-both.html）載入 /viewer/app.js\n/viewer/app.js 若 Effects 未載入會動態載入 /viewer/effects.js\nfetch /api/effects → 並行動態載入各 /effects/{id}/viewer.js（單一失敗僅 log 並跳過該特效）
     C->>C: 選特效 → selectEffect() → renderParams()
     C->>C: 點擊 → paramsFor() 讀取 rtx-p-* 輸入
@@ -162,7 +162,8 @@ classDiagram
     }
     class ConsolePlugin {
         <<effects/<id>/console.js（選用）>>
-        +icon
+        +iconID（RTX_EFFECT_ICONS key）
+        +iconSVG（raw SVG 字串）
         +render(container, api)
     }
     class Effect {
@@ -201,7 +202,10 @@ classDiagram
         +panelSize()
         +clampPanelPos(x, y, w, h)
         +overlapArea(a, b)
-        +iconFor(type)
+        +isSvgString(v)
+        +resolvedPluginIcon(type)
+        +iconFor(type, meta)
+        +hasIconFor(type, meta)
         +uiIcon(name)
         +genericFields(params)
         +fieldDefs(type)
@@ -218,7 +222,7 @@ classDiagram
     Viewer ..> Effects : toPixels / createEffect / stepEffect
     EffectPlugin ..> Effects : register(type, factory)
     Effects ..> Effect : 建立（particle / firework / ripple / text）
-    Console ..> ConsolePlugin : 選用 render（缺失時 schema 渲染）
+    Console ..> ConsolePlugin : 選用 render／iconID／iconSVG（缺失時 schema 渲染／manifest icon）
     Console ..> Server : POST /api/effect / POST /api/clear
     Server ..> EffectCatalog : 讀取 MANIFEST / EFFECTS
     EffectCatalog ..> EffectPlugin : manifest 宣告 /effects/<id>/viewer.js
@@ -231,7 +235,8 @@ classDiagram
 flowchart LR
     TA["tests/test_api.py<br/>pytest＋TestClient（33）"] --> M["server/main.py"]
     TE["tests/test_effects.mjs<br/>node --test＋vm（17）"] --> S["viewer/effects.js ＋ effects/*/viewer.js"]
-    TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（45）"] --> K["console/app.js ＋ effects/*/console.js"]
+    TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（51）"] --> K["console/app.js ＋ effects/*/console.js"]
+    TX["tests/test_effect_examples.mjs<br/>node --test＋vm fake sandbox（16）"] --> X["examples/effects/*/effects.json ＋ viewer.js ＋ console.js"]
 ```
 
 ## 7. 未完成或未接線節點
@@ -240,10 +245,11 @@ flowchart LR
 | --- | --- |
 | server 暫存最近 N 則（斷線重播） | 未實作（規格：預設不重播） |
 | viewer 狀態回報（POST /api/status） | 未實作（規格：僅 log） |
+| examples/effects/*（sample-burst、effect-interface） | 僅為新增特效的參考範例（docs/HOW_TO_ADD_EFFECT.md），未登記於正式 manifest `effects/effects.json`，server 不服務 |
 
 執行測試：
 
 ```
 python -m pytest tests/ -v
-node --test tests/test_effects.mjs tests/test_console.mjs
+node --test tests/test_effects.mjs tests/test_console.mjs tests/test_effect_examples.mjs
 ```

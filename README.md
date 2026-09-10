@@ -53,7 +53,7 @@ python -m uvicorn server.main:app --port 8000   # server 中繼（專案根目�
 `effects/effects.json` 是唯一特效清單（manifest），server、viewer、console 皆由其驅動：
 
 - `effects/<id>/viewer.js`：特效繪製實作，執行時註冊 `window.Effects.register(id, factory)`
-- `effects/<id>/console.js`（選用）：自訂 console 參數 UI，註冊 `window.RTX_EFFECT_CONSOLE.register(id, { icon, render })`；缺省时 console 依 schema 自動渲染
+- `effects/<id>/console.js`（選用）：自訂 console 參數 UI，註冊 `window.RTX_EFFECT_CONSOLE.register(id, { iconID, iconSVG, render })`；`iconID` 為 `RTX_EFFECT_ICONS` 的 key、`iconSVG` 為 raw SVG 字串（有效 `iconSVG`／`iconID` 優先於 manifest `icon`）；缺省时 console 依 schema 自動渲染
 - `params` schema 型別：`integer`／`number`／`string`／`color`／`boolean`／`select`／`array`；`editable: false` 不顯示輸入項；`POST /api/effect` 的 params 由 server 依 schema 驗證（無效值回退預設值）
 
 相關 server 路由（皆 `Cache-Control: no-store`）：
@@ -62,7 +62,7 @@ python -m uvicorn server.main:app --port 8000   # server 中繼（專案根目�
 - `GET /effects/{effect_id}/viewer.js`
 - `GET /effects/{effect_id}/console.js`
 
-新增特效：在 `effects/effects.json` 加一個 entry ＋ 建立 `effects/<id>/viewer.js` 即可；server／console 程式碼不需修改。
+新增特效：在 `effects/effects.json` 加一個 entry ＋ 建立 `effects/<id>/viewer.js` 即可；server／console 程式碼不需修改。詳見 `docs/HOW_TO_ADD_EFFECT.md`；完整範例參考 `examples/effects/sample-burst/`、最小介面參考 `examples/effects/effect-interface/`（兩者非正式 manifest）。
 
 ## 嵌入示範頁（examples，opt-in）
 
@@ -94,7 +94,7 @@ set SERVE_EXAMPLES=1 && python -m uvicorn server.main:app --port 8000
 
 ```
 python -m pytest tests/ -q
-node --test tests/test_effects.mjs tests/test_console.mjs
+node --test tests/test_effects.mjs tests/test_console.mjs tests/test_effect_examples.mjs
 ```
 
 ## 文件維護原則

@@ -239,7 +239,8 @@ async function makeEnv(opts = {}) {
     URL,
   };
   vm.createContext(sandbox);
-  vm.runInContext(iconsSrc, sandbox);
+  if ("effectIcons" in opts) window.RTX_EFFECT_ICONS = opts.effectIcons;
+  else vm.runInContext(iconsSrc, sandbox);
 
   if (opts.existingRoot) {
     const existing = makeEl("div");
@@ -575,7 +576,7 @@ test("registered console plugin overrides schema render", async () => {
         registry.registry[t] = p;
       };
       registry.registry.particle = {
-        icon: "particle",
+        iconID: "particle",
         render(container, api) {
           const field = doc.createElement("div");
           field.className = "rtx-field";
@@ -605,6 +606,115 @@ test("registered console plugin overrides schema render", async () => {
   assert.equal(sent.params.count, 77);
 });
 
+test("console plugin valid iconSVG is used and button is not generic", async () => {
+  const rawSvg = "<svg viewBox='0 0 24 24' aria-hidden='true'><rect x='4' y='4' width='16' height='16'/></svg>";
+  const env = await makeEnv({
+    consoleRegistry: (doc) => {
+      const registry = { registry: {} };
+      registry.register = (t, p) => {
+        registry.registry[t] = p;
+      };
+      registry.registry.particle = { iconSVG: rawSvg };
+      return registry;
+    },
+  });
+  const btn = env.node("rtx-fx-particle");
+  assert.equal(btn.innerHTML, rawSvg);
+  assert.equal(btn.classList.contains("generic"), false);
+});
+
+test("console plugin valid iconID resolves through RTX_EFFECT_ICONS", async () => {
+  const env = await makeEnv({
+    consoleRegistry: (doc) => {
+      const registry = { registry: {} };
+      registry.register = (t, p) => {
+        registry.registry[t] = p;
+      };
+      registry.registry.ripple = { iconID: "firework" };
+      return registry;
+    },
+  });
+  const btn = env.node("rtx-fx-ripple");
+  assert.equal(btn.innerHTML, env.win.RTX_EFFECT_ICONS.firework);
+  assert.equal(btn.classList.contains("generic"), false);
+});
+
+test("console plugin iconSVG takes priority over iconID", async () => {
+  const rawSvg = "<svg viewBox='0 0 24 24' aria-hidden='true'><rect x='4' y='4' width='16' height='16'/></svg>";
+  const env = await makeEnv({
+    consoleRegistry: (doc) => {
+      const registry = { registry: {} };
+      registry.register = (t, p) => {
+        registry.registry[t] = p;
+      };
+      registry.registry.particle = { iconSVG: rawSvg, iconID: "firework" };
+      return registry;
+    },
+  });
+  const btn = env.node("rtx-fx-particle");
+  assert.equal(btn.innerHTML, rawSvg);
+  assert.equal(btn.classList.contains("generic"), false);
+});
+
+test("legacy plugin icon field no longer affects icon resolution", async () => {
+  const env = await makeEnv({
+    consoleRegistry: (doc) => {
+      const registry = { registry: {} };
+      registry.register = (t, p) => {
+        registry.registry[t] = p;
+      };
+      registry.registry.particle = { icon: "firework" };
+      return registry;
+    },
+  });
+  const btn = env.node("rtx-fx-particle");
+  assert.equal(btn.innerHTML, env.win.RTX_EFFECT_ICONS.particle);
+  assert.equal(btn.classList.contains("generic"), false);
+});
+
+test("invalid plugin iconSVG and iconID fall back to manifest and generic icons", async () => {
+  const env = await makeEnv({
+    effects: {
+      spark: { name: "Spark", icon: "particle", params: { count: 1 } },
+      ghost: { name: "Ghost", params: {} },
+    },
+    consoleRegistry: (doc) => {
+      const registry = { registry: {} };
+      registry.register = (t, p) => {
+        registry.registry[t] = p;
+      };
+      registry.registry.spark = { iconSVG: 42 };
+      registry.registry.ghost = { iconID: "no-such-icon" };
+      return registry;
+    },
+  });
+  assert.equal(env.node("rtx-fx-spark").innerHTML, env.win.RTX_EFFECT_ICONS.particle);
+  assert.equal(env.node("rtx-fx-spark").classList.contains("generic"), false);
+  assert.equal(env.node("rtx-fx-ghost").innerHTML, env.win.RTX_EFFECT_ICONS.generic);
+  assert.equal(env.node("rtx-fx-ghost").classList.contains("generic"), true);
+});
+
+test("invalid plugin iconID falls back to built-in fallback icon without icon table", async () => {
+  const env = await makeEnv({
+    effectIcons: {},
+    effects: { ghost: { name: "Ghost", params: {} } },
+    consoleRegistry: (doc) => {
+      const registry = { registry: {} };
+      registry.register = (t, p) => {
+        registry.registry[t] = p;
+      };
+      registry.registry.ghost = { iconID: "no-such-icon" };
+      return registry;
+    },
+  });
+  const btn = env.node("rtx-fx-ghost");
+  assert.equal(
+    btn.innerHTML,
+    "<svg viewBox='0 0 24 24' aria-hidden='true'><circle cx='12' cy='12' r='9'/><circle cx='12' cy='12' r='3'/></svg>"
+  );
+  assert.equal(btn.classList.contains("generic"), true);
+});
+
 test("console plugin source no-ops without RTX_EFFECT_CONSOLE", async () => {
   const pluginSrc = readFileSync(join(root, "effects", "particle", "console.js"), "utf8");
   const sandbox = { window: {}, console: { info() {}, warn() {} } };
@@ -627,7 +737,7 @@ test("console plugin source registers into existing RTX_EFFECT_CONSOLE", async (
   vm.runInContext(pluginSrc, sandbox);
   assert.equal(typeof registry.registry.particle, "object");
   assert.equal(typeof registry.registry.particle.render, "function");
-  assert.equal(registry.registry.particle.icon, "particle");
+  assert.equal(registry.registry.particle.iconID, "particle");
 });
 
 test("click on body sends effect with 0-100 coords", async () => {

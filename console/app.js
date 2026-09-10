@@ -234,9 +234,31 @@
 
   var FALLBACK_ICON = "<svg viewBox='0 0 24 24' aria-hidden='true'><circle cx='12' cy='12' r='9'/><circle cx='12' cy='12' r='3'/></svg>";
   var externalIcons = window.RTX_EFFECT_ICONS || {};
+  function isSvgString(v) {
+    return typeof v === "string" && /^\s*<svg[\s>]/.test(v) && /<\/svg>\s*$/i.test(v);
+  }
+  function resolvedPluginIcon(type) {
+    var plugin = consoleRegistry.registry[type];
+    if (!plugin) return null;
+    if (isSvgString(plugin.iconSVG)) return plugin.iconSVG;
+    if (typeof plugin.iconID === "string" && externalIcons[plugin.iconID]) {
+      return externalIcons[plugin.iconID];
+    }
+    return null;
+  }
   function iconFor(type, meta) {
     var m = meta || {};
-    return externalIcons[m.icon] || externalIcons[type] || externalIcons.generic || FALLBACK_ICON;
+    return (
+      resolvedPluginIcon(type) ||
+      externalIcons[m.icon] ||
+      externalIcons[type] ||
+      externalIcons.generic ||
+      FALLBACK_ICON
+    );
+  }
+  function hasIconFor(type, meta) {
+    var m = meta || {};
+    return !!(resolvedPluginIcon(type) || externalIcons[m.icon] || externalIcons[type]);
   }
 
   var consoleRegistry =
@@ -416,7 +438,7 @@
     Object.keys(EFFECTS_META).forEach(function (type) {
       var e = EFFECTS_META[type] || {};
       var name = e.name || type;
-      var hasIcon = !!(externalIcons[e.icon] || externalIcons[type]);
+      var hasIcon = hasIconFor(type, e);
       var btn = make("button", "rtx-fx-" + type, "rtx-fx" + (hasIcon ? "" : " generic"));
       btn.setAttribute("data-fx", type);
       btn.title = name;

@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "effects": {
+    "sample-burst": {
+      "label": "示範爆散",
+      "category": "burst",
+      "icon": "particle",
+      "viewer": "viewer.js",
+      "console": "console.js",
+      "params": {
+        "count": {
+          "type": "integer",
+          "label": "數量",
+          "default": 40,
+          "min": 1,
+          "max": 400,
+          "step": 1
+        },
+        "spread": {
+          "type": "number",
+          "label": "散佈(度)",
+          "default": 360,
+          "min": 0,
+          "max": 360,
+          "step": 5
+        },
+        "speed": {
+          "type": "number",
+          "label": "速度",
+          "default": 0.35,
+          "min": 0.05,
+          "max": 2,
+          "step": 0.05
+        },
+        "duration": {
+          "type": "integer",
+          "label": "持續(ms)",
+          "default": 1200,
+          "min": 200,
+          "max": 8000,
+          "step": 100
+        },
+        "content": {
+          "type": "string",
+          "label": "文字",
+          "default": "Sample",
+          "maxLength": 12
+        },
+        "color": {
+          "type": "color",
+          "label": "顏色",
+          "default": "#ff5252"
+        },
+        "secondaryColor": {
+          "type": "color",
+          "label": "副色",
+          "default": "#ffd740"
+        },
+        "sparkle": {
+          "type": "boolean",
+          "label": "閃爍",
+          "default": true,
+          "editable": true
+        },
+        "style": {
+          "type": "select",
+          "label": "樣式",
+          "default": "circle",
+          "options": [
+            { "value": "circle", "label": "圓點" },
+            { "value": "square", "label": "方塊" },
+            { "value": "ring", "label": "圓環" }
+          ]
+        },
+        "palette": {
+          "type": "array",
+          "items": "color",
+          "label": "色盤",
+          "default": ["#ff5252", "#ffd740", "#40c4ff", "#69f0ae"],
+          "minItems": 1,
+          "maxItems": 8,
+          "editable": false
+        }
+      }
+    }
+  }
+}

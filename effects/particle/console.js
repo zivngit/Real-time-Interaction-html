@@ -4,7 +4,7 @@
   if (typeof window === "undefined" || !window.RTX_EFFECT_CONSOLE) return;
 
   window.RTX_EFFECT_CONSOLE.register("particle", {
-    icon: "particle",
+    iconID: "particle",
     render: function (container, api) {
       var fields = [
         { key: "color", label: "顏色", type: "color" },
