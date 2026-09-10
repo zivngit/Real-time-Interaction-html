@@ -7,6 +7,7 @@ import vm from "node:vm";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const src = readFileSync(join(root, "console", "app.js"), "utf8");
+const iconsSrc = readFileSync(join(root, "console", "icons.js"), "utf8");
 const css = readFileSync(join(root, "console", "style.css"), "utf8");
 
 const DEFAULT_EFFECTS = {
@@ -175,6 +176,7 @@ async function makeEnv(opts = {}) {
     URL,
   };
   vm.createContext(sandbox);
+  vm.runInContext(iconsSrc, sandbox);
 
   if (opts.existingRoot) {
     const existing = makeEl("div");
@@ -193,6 +195,7 @@ async function makeEnv(opts = {}) {
     head,
     fetchCalls,
     store,
+    win: window,
     fireWindow: (t, evt) => (windowListeners[t] || []).slice().forEach((fn) => fn(evt)),
     runAgain: () => vm.runInContext(src, sandbox),
   };
@@ -280,6 +283,14 @@ test("known effect buttons are not generic", async () => {
   for (const id of ["rtx-fx-particle", "rtx-fx-ripple", "rtx-fx-firework", "rtx-fx-text"]) {
     assert.equal(env.node(id).classList.contains("generic"), false);
   }
+});
+
+test("uses external icons.js for effect icons", async () => {
+  const env = await makeEnv();
+  assert.ok(env.win.RTX_ICONS);
+  assert.ok(env.win.RTX_ICONS.particle);
+  assert.ok(env.win.RTX_ICONS.generic);
+  assert.ok(env.node("rtx-fx-particle").innerHTML.includes("<svg"));
 });
 
 test("unknown effect renders generic button and generic params", async () => {

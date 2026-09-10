@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SHARED_APP_JS = ROOT / "shared" / "app.js"
 VIEWER_EFFECTS_JS = ROOT / "viewer" / "effects.js"
 CONSOLE_APP_JS = ROOT / "console" / "app.js"
+CONSOLE_ICONS_JS = ROOT / "console" / "icons.js"
 CONSOLE_CSS = ROOT / "console" / "style.css"
 
 ACCESS_KEY = os.getenv("ACCESS_KEY", "").strip()
@@ -167,6 +168,13 @@ async def console_js():
     if not CONSOLE_APP_JS.exists():
         raise HTTPException(status_code=404, detail="console/app.js not found")
     return FileResponse(CONSOLE_APP_JS, media_type="application/javascript", headers=NO_STORE)
+
+
+@app.get("/icons.js")
+async def icons_js():
+    if not CONSOLE_ICONS_JS.exists():
+        raise HTTPException(status_code=404, detail="console/icons.js not found")
+    return FileResponse(CONSOLE_ICONS_JS, media_type="application/javascript", headers=NO_STORE)
 
 
 @app.get("/console.css")
