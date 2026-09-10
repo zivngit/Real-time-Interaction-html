@@ -89,40 +89,40 @@ def test_clear(client):
     assert r.json()["ok"] is True
 
 
-def test_serves_app_js(client):
-    r = client.get("/app.js")
+def test_serves_viewer_app_js(client):
+    r = client.get("/viewer/app.js")
     assert r.status_code == 200
     assert "javascript" in r.headers["content-type"]
     assert r.headers["cache-control"] == "no-store"
     assert "EventSource" in r.text
 
 
-def test_serves_effects_js(client):
-    r = client.get("/effects.js")
+def test_serves_viewer_effects_js(client):
+    r = client.get("/viewer/effects.js")
     assert r.status_code == 200
     assert "javascript" in r.headers["content-type"]
     assert r.headers["cache-control"] == "no-store"
     assert "createEffect" in r.text
 
 
-def test_serves_console_js(client):
-    r = client.get("/console.js")
+def test_serves_console_app_js(client):
+    r = client.get("/console/app.js")
     assert r.status_code == 200
     assert "javascript" in r.headers["content-type"]
     assert r.headers["cache-control"] == "no-store"
     assert "rtx-console" in r.text
 
 
-def test_serves_console_css(client):
-    r = client.get("/console.css")
+def test_serves_console_style_css(client):
+    r = client.get("/console/style.css")
     assert r.status_code == 200
     assert "css" in r.headers["content-type"]
     assert r.headers["cache-control"] == "no-store"
     assert "#rtx-fab" in r.text
 
 
-def test_serves_icons_js(client):
-    r = client.get("/icons.js")
+def test_serves_console_icons_js(client):
+    r = client.get("/console/icons.js")
     assert r.status_code == 200
     assert "javascript" in r.headers["content-type"]
     assert r.headers["cache-control"] == "no-store"
@@ -130,12 +130,19 @@ def test_serves_icons_js(client):
     assert "RTX_UI_ICONS" in r.text
 
 
+def test_legacy_asset_routes_removed(client):
+    for route in ("/app.js", "/effects.js", "/console.js", "/icons.js", "/console.css"):
+        assert client.get(route).status_code == 404
+
+
 def test_rate_limit(client, monkeypatch):
     monkeypatch.setattr(m, "RATE_LIMIT_PER_SEC", 3)
     m._rate_window.clear()
     for _ in range(3):
         assert client.post("/api/effect", json={"effect": "ripple", "x": 1, "y": 1}).status_code == 200
-    assert client.post("/api/effect", json={"effect": "ripple", "x": 1, "y": 1}).status_code == 429
+    r = client.post("/api/effect", json={"effect": "ripple", "x": 1, "y": 1})
+    assert r.status_code == 429
+    assert r.headers["retry-after"] == "1"
 
 
 def test_access_key_enforced(client, monkeypatch):
@@ -233,12 +240,12 @@ def test_examples_enabled_when_serve_examples_set(client, monkeypatch):
     assert "/console/index.html" not in r.text
     r = client.get("/examples/embed-viewer.html")
     assert r.status_code == 200
-    assert "/app.js" in r.text
+    assert "/viewer/app.js" in r.text
     r = client.get("/examples/embed-console.html")
     assert r.status_code == 200
-    for asset in ("/console.css", "/icons.js", "/console.js"):
+    for asset in ("/console/style.css", "/console/icons.js", "/console/app.js"):
         assert asset in r.text
     r = client.get("/examples/embed-both.html")
     assert r.status_code == 200
-    assert "/app.js" in r.text
-    assert "/console.js" in r.text
+    assert "/viewer/app.js" in r.text
+    assert "/console/app.js" in r.text

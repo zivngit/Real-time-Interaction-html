@@ -534,7 +534,7 @@ test("no access key header when key is empty", async () => {
 test("CONTROL_CONFIG overrides script origin and localStorage", async () => {
   const env = await makeEnv({
     controlConfig: { url: "http://config:8080/", key: "cfg" },
-    scriptSrc: "http://script:8010/console.js",
+    scriptSrc: "http://script:8010/console/app.js",
     scriptKey: "script",
     stored: { "rtx.srvUrl": "http://stored:8011/", "rtx.srvKey": "stored" },
   });
@@ -546,16 +546,16 @@ test("CONTROL_CONFIG overrides script origin and localStorage", async () => {
   assert.equal(call.opts.headers["X-Access-Key"], "cfg");
 });
 
-test("script origin is used only for /console.js", async () => {
-  const env1 = await makeEnv({ scriptSrc: "http://script:8010/console.js" });
+test("script origin is used only for /console/app.js", async () => {
+  const env1 = await makeEnv({ scriptSrc: "http://script:8010/console/app.js" });
   assert.equal(env1.node("rtx-srv-url").value, "http://script:8010");
-  const env2 = await makeEnv({ scriptSrc: "http://script:8010/app.js" });
+  const env2 = await makeEnv({ scriptSrc: "http://script:8010/viewer/app.js" });
   assert.equal(env2.node("rtx-srv-url").value, "http://localhost:8000");
 });
 
 test("script data-key is used when no CONTROL_CONFIG key", async () => {
   const env = await makeEnv({
-    scriptSrc: "http://script:8010/console.js",
+    scriptSrc: "http://script:8010/console/app.js",
     scriptKey: "scriptKey",
   });
   assert.equal(env.node("rtx-srv-key").value, "scriptKey");

@@ -25,6 +25,8 @@ ACCESS_KEY = os.getenv("ACCESS_KEY", "").strip()
 
 RATE_LIMIT_PER_SEC = 20
 
+NO_STORE = {"Cache-Control": "no-store"}
+
 app = FastAPI(title="Real-time Interaction relay")
 app.add_middleware(
     CORSMiddleware,
@@ -51,7 +53,7 @@ async def _rate_limit() -> None:
         while _rate_window and now - _rate_window[0] > 1.0:
             _rate_window.popleft()
         if len(_rate_window) >= RATE_LIMIT_PER_SEC:
-            raise HTTPException(status_code=429, detail="rate limit exceeded")
+            raise HTTPException(status_code=429, detail="rate limit exceeded", headers={"Retry-After": "1"})
         _rate_window.append(now)
 
 
@@ -141,48 +143,40 @@ async def stream(
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
         },
     )
 
 
-NO_STORE = {"Cache-Control": "no-store"}
+def _file_response(path: Path, media_type: str, detail: str):
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=detail)
+    return FileResponse(path, media_type=media_type, headers=NO_STORE)
 
 
-@app.get("/app.js")
-async def app_js():
-    if not VIEWER_APP_JS.exists():
-        raise HTTPException(status_code=404, detail="viewer/app.js not found")
-    return FileResponse(VIEWER_APP_JS, media_type="application/javascript", headers=NO_STORE)
+@app.get("/viewer/app.js")
+async def viewer_app_js():
+    return _file_response(VIEWER_APP_JS, "application/javascript", "viewer/app.js not found")
 
 
-@app.get("/effects.js")
-async def effects_js():
-    if not VIEWER_EFFECTS_JS.exists():
-        raise HTTPException(status_code=404, detail="viewer/effects.js not found")
-    return FileResponse(VIEWER_EFFECTS_JS, media_type="application/javascript", headers=NO_STORE)
+@app.get("/viewer/effects.js")
+async def viewer_effects_js():
+    return _file_response(VIEWER_EFFECTS_JS, "application/javascript", "viewer/effects.js not found")
 
 
-@app.get("/console.js")
-async def console_js():
-    if not CONSOLE_APP_JS.exists():
-        raise HTTPException(status_code=404, detail="console/app.js not found")
-    return FileResponse(CONSOLE_APP_JS, media_type="application/javascript", headers=NO_STORE)
+@app.get("/console/app.js")
+async def console_app_js():
+    return _file_response(CONSOLE_APP_JS, "application/javascript", "console/app.js not found")
 
 
-@app.get("/icons.js")
-async def icons_js():
-    if not CONSOLE_ICONS_JS.exists():
-        raise HTTPException(status_code=404, detail="console/icons.js not found")
-    return FileResponse(CONSOLE_ICONS_JS, media_type="application/javascript", headers=NO_STORE)
+@app.get("/console/icons.js")
+async def console_icons_js():
+    return _file_response(CONSOLE_ICONS_JS, "application/javascript", "console/icons.js not found")
 
 
-@app.get("/console.css")
-async def console_css():
-    if not CONSOLE_CSS.exists():
-        raise HTTPException(status_code=404, detail="console/style.css not found")
-    return FileResponse(CONSOLE_CSS, media_type="text/css", headers=NO_STORE)
+@app.get("/console/style.css")
+async def console_style_css():
+    return _file_response(CONSOLE_CSS, "text/css", "console/style.css not found")
 
 
 def _examples_enabled() -> bool:

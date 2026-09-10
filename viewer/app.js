@@ -7,7 +7,7 @@
   if (script && script.src) {
     try {
       var u = new URL(script.src);
-      if (u.pathname === "/app.js") origin = u.origin;
+      if (u.pathname === "/viewer/app.js") origin = u.origin;
     } catch (e) {}
   }
   var base = String(cfg.url || origin || "http://localhost:8000").replace(/\/+$/, "");
@@ -135,7 +135,7 @@
     boot();
   } else {
     var s = document.createElement("script");
-    s.src = base + "/effects.js";
+    s.src = base + "/viewer/effects.js";
     s.onload = boot;
     s.onerror = function () {
       console.error("[effects] effects.js 載入失敗", s.src);

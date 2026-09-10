@@ -12,7 +12,7 @@
     if (script.src) {
       try {
         var u = new URL(script.src);
-        if (u.pathname === "/console.js") origin = u.origin;
+        if (u.pathname === "/console/app.js") origin = u.origin;
       } catch (e) {}
     }
   }

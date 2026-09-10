@@ -5,14 +5,14 @@
 - console（控制）選特效＋位置 → server（Python FastAPI 中繼）→ viewer（顯示）以 SSE 即時渲染相對位置
 - 通訊：console→server `POST`；server→viewer `SSE /api/stream`（15s 心跳 ping）
 - 座標：整個視窗百分比 0–100；特效：particle/ripple/firework/text；`clear` 事件清屏
-- viewer 可嵌入：`GET /app.js` 一行嵌入，canvas 疊層 `pointer-events: none` 不影響宿主網頁
+- viewer 可嵌入：`GET /viewer/app.js` 一行嵌入，canvas 疊層 `pointer-events: none` 不影響宿主網頁
 - 存取金鑰：`ACCESS_KEY` 環境變數，空白＝全開放；POST 用 `X-Access-Key`、SSE 用 `?key=`
 
 ## 已知優先風險
 
 - SSE 斷線期間特效遺失（規格：不重播）
 - 限頻為全域滑動視窗（未區分客戶端）
-- 前端（console/viewer）無瀏覽器自動化測試；console 有 node vm 冒煙測試（tests/test_console.mjs，37 項），viewer 仍無
+- 前端（console/viewer）無瀏覽器自動化測試；console 有 node vm 冒煙測試（tests/test_console.mjs，39 項），viewer 仍無
 
 ## 第一階段：建立可維護的執行基礎
 
@@ -40,6 +40,7 @@
 - [x] examples：opt-in 嵌入示範頁（`examples/` 四頁；server 新增 `GET /examples`、`/examples/`、`/examples/{path:path}`，預設 404，`SERVE_EXAMPLES=1` 啟用；tests/test_api.py 新增 2 項）（2026-09-10）
 - [x] examples 改為 demo／showcase 頁：移除 standalone 展示頁 `console/index.html`、`viewer/index.html`；`shared/app.js` 移至 `viewer/app.js`（server `/app.js` 改 serve `viewer/app.js`，`shared/` 目錄移除；`examples/index.html` 不再連結 standalone 頁）（2026-09-10）
 - [x] viewer：移除無頁面引用的 `viewer/style.css`（standalone viewer 頁與 examples 嵌入頁皆不再使用）（2026-09-10）
+- [x] server API：embed asset routes 改名為 namespaced paths（`/viewer/app.js`、`/viewer/effects.js`、`/console/app.js`、`/console/icons.js`、`/console/style.css`；舊根路徑 asset routes 回 404）；429 回應加 `Retry-After: 1`，SSE 不再手動發送 `Connection: keep-alive`（2026-09-10）
 - [ ] server 斷線重播暫存（最近 N 則）
 - [ ] viewer 狀態回報（POST /api/status）
 - [ ] 多 viewer 負載／效能測試

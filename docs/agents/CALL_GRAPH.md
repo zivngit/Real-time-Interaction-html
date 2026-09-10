@@ -13,9 +13,9 @@ flowchart LR
     LS[("localStorage<br/>rtx.srvUrl / rtx.srvKey")]
     C -->|"POST /api/effect、POST /api/clear"| S
     C -->|"GET /api/effects"| S
-    C -->|"GET /console.css、/icons.js、/console.js (no-store)"| S
+    C -->|"GET /console/style.css、/console/icons.js、/console/app.js (no-store)"| S
     S -->|"GET /api/stream<br/>(SSE: effect / clear / ping)"| V
-    V -->|"GET /app.js、/effects.js (no-store)"| S
+    V -->|"GET /viewer/app.js、/viewer/effects.js (no-store)"| S
     S -->|"GET /examples/*（no-store，opt-in）"| E
     E -->|"連結 embed-*.html"| C
     E -->|"連結 embed-*.html"| V
@@ -35,7 +35,7 @@ flowchart TD
         ST["GET /api/stream"]
         H["GET /health"]
         LE["GET /api/effects"]
-        JS["GET /app.js / /effects.js / /icons.js / /console.js / /console.css"]
+        JS["GET /viewer/app.js / /viewer/effects.js / /console/app.js / /console/icons.js / /console/style.css"]
         EX["GET /examples / /examples/ / /examples/{path}"]
     end
 
@@ -59,7 +59,7 @@ flowchart TD
         direction LR
         E401["HTTP 401 invalid access key"]
         E400["HTTP 400 unknown effect"]
-        E429["HTTP 429 rate limit exceeded"]
+        E429["HTTP 429 rate limit exceeded（Retry-After: 1）"]
         E404["HTTP 404 examples 停用或檔案不存在"]
     end
 
@@ -103,8 +103,8 @@ sequenceDiagram
     participant S as server（server/main.py）
     participant V as viewer（viewer/app.js）
 
-    Note over C: examples/embed-console.html（＋embed-both.html）載入 /console.css＋/icons.js＋/console.js\n初始化 → loadEffects() fetch /api/effects\n成功 → renderEffects() 動態建立特效按鈕（未知特效 generic）\n失敗/空表 → fallback 內建特效\nparamsBtn / connBtn → bindToggle()（展開時 applyFabPos()）\napplyFabPos() → panelCandidates() 選最小重疊位置；FAB z-index 高於 panel
-    Note over V: examples/embed-viewer.html（＋embed-both.html）載入 /app.js\n/app.js 若 Effects 未載入會動態載入 /effects.js
+    Note over C: examples/embed-console.html（＋embed-both.html）載入 /console/style.css＋/console/icons.js＋/console/app.js\n初始化 → loadEffects() fetch /api/effects\n成功 → renderEffects() 動態建立特效按鈕（未知特效 generic）\n失敗/空表 → fallback 內建特效\nparamsBtn / connBtn → bindToggle()（展開時 applyFabPos()）\napplyFabPos() → panelCandidates() 選最小重疊位置；FAB z-index 高於 panel
+    Note over V: examples/embed-viewer.html（＋embed-both.html）載入 /viewer/app.js\n/viewer/app.js 若 Effects 未載入會動態載入 /viewer/effects.js
     C->>C: 選特效 → selectEffect() → renderParams()
     C->>C: 點擊 → paramsFor() 讀取 rtx-p-* 輸入
     C->>S: POST /api/effect {effect, x, y, params}
@@ -205,7 +205,7 @@ classDiagram
 
 ```mermaid
 flowchart LR
-    TA["tests/test_api.py<br/>pytest＋TestClient（17）"] --> M["server/main.py"]
+    TA["tests/test_api.py<br/>pytest＋TestClient（18）"] --> M["server/main.py"]
     TE["tests/test_effects.mjs<br/>node --test（13）"] --> S["viewer/effects.js"]
     TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（39）"] --> K["console/app.js"]
 ```
