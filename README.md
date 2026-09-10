@@ -43,16 +43,17 @@ pip install -r server/requirements-dev.txt            # 含測試依賴
 python -m uvicorn server.main:app --port 8000   # server 中繼（專案根目錄執行）
 ```
 
-- console 控制端：瀏覽器開啟 `console/index.html`
+- console 控制端：瀏覽器開啟 `console/index.html`（特效清單動態載入自 server `/api/effects`；未知特效以通用樣式與參數顯示）
 - viewer 顯示端：瀏覽器開啟 `viewer/index.html`（獨立預覽）
-- 嵌入其他網頁：`<script src="http://<server-host>:8000/app.js"></script>`
-- 存取金鑰（可選）：設定環境變數 `ACCESS_KEY`；console 於面板填入、嵌入用 `data-key="..."`
+- viewer 嵌入其他網頁：`<script src="http://<server-host>:8000/app.js"></script>`
+- console 嵌入其他網頁：`<script src="http://<server-host>:8000/console.js" data-key="..."></script>`（可先定義 `window.CONTROL_CONFIG = { url, key }`）
+- 存取金鑰（可選）：server 設定環境變數 `ACCESS_KEY`；console 可於面板填入、嵌入用 `data-key="..."` 或 `window.CONTROL_CONFIG.key`
 
 測試：
 
 ```
-python -m pytest tests/ -v
-node --test tests/test_effects.mjs
+python -m pytest tests/ -q
+node --test tests/test_effects.mjs tests/test_console.mjs
 ```
 
 ## 文件維護原則

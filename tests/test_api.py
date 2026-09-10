@@ -105,6 +105,14 @@ def test_serves_effects_js(client):
     assert "createEffect" in r.text
 
 
+def test_serves_console_js(client):
+    r = client.get("/console.js")
+    assert r.status_code == 200
+    assert "javascript" in r.headers["content-type"]
+    assert r.headers["cache-control"] == "no-store"
+    assert "rtx-console" in r.text
+
+
 def test_rate_limit(client, monkeypatch):
     monkeypatch.setattr(m, "RATE_LIMIT_PER_SEC", 3)
     m._rate_window.clear()

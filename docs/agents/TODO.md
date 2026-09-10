@@ -12,7 +12,7 @@
 
 - SSE 斷線期間特效遺失（規格：不重播）
 - 限頻為全域滑動視窗（未區分客戶端）
-- 前端（console/viewer）無瀏覽器自動化測試；console 有 node vm 冒煙測試（tests/test_console.mjs），viewer 仍無
+- 前端（console/viewer）無瀏覽器自動化測試；console 有 node vm 冒煙測試（tests/test_console.mjs，34 項），viewer 仍無
 
 ## 第一階段：建立可維護的執行基礎
 
@@ -31,6 +31,8 @@
 - [x] console UI：拖曳改為按住即啟動（移除 350ms 等待）、panel 跟隨後亦 clamp 於視窗內（含水平）（2026-09-09）
 - [x] console UI：特效分組（爆散／漣漪／文字）＋［參數］按鍵（依目前特效展開參數輸入）＋［連線設定］按鍵（收合 srvUrl/srvKey 至展開面板；vm 冒煙測試再增 4 項，共 15 項）（2026-09-10）
 - [x] console UI：統一圓形圖示按鈕（方形→圓形、文字→SVG 圖示、懸停顯示名稱；特效按鈕 52px 主視覺，［參數］／［連線設定］／［清屏］縮小 34px 次要，聚焦特效按鈕）（2026-09-10）
+- [x] console：server 特效表動態建立按鈕（`GET /api/effects`；未知特效使用通用樣式與參數；載入失敗時 fallback 至內建特效；vm 測試擴充至 34 項）（2026-09-10）
+- [x] console：可嵌入其他網頁（self-contained、scoped style、unique IDs、double-load guard；server 新增 `GET /console.js`；支援 `window.CONTROL_CONFIG`／script origin／`data-key`／localStorage 設定優先序）（2026-09-10）
 - [ ] server 斷線重播暫存（最近 N 則）
 - [ ] viewer 狀態回報（POST /api/status）
 - [ ] 多 viewer 負載／效能測試

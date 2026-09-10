@@ -11,8 +11,10 @@ flowchart LR
     V["viewer/index.html<br/>shared/app.js + shared/effects.js"]
     LS[("localStorage<br/>rtx.srvUrl / rtx.srvKey")]
     C -->|"POST /api/effect、POST /api/clear"| S
+    C -->|"GET /api/effects"| S
     S -->|"GET /api/stream<br/>(SSE: effect / clear / ping)"| V
     S -->|"GET /app.js、/effects.js (no-store)"| V
+    S -->|"GET /console.js (no-store)"| C
     LS -.-> C
 ```
 
@@ -29,7 +31,7 @@ flowchart TD
         ST["GET /api/stream"]
         H["GET /health"]
         LE["GET /api/effects"]
-        JS["GET /app.js / /effects.js"]
+        JS["GET /app.js / /effects.js / /console.js"]
     end
 
     subgraph guard["驗證"]
@@ -91,8 +93,9 @@ sequenceDiagram
     participant S as server（server/main.py）
     participant V as viewer（shared/app.js）
 
-    Note over C: 選特效 → renderParams() 渲染該特效之 p-* 參數輸入\nparamsBtn / connBtn → bindToggle()（展開時 applyFabPos()）
-    C->>C: 點擊 → paramsFor() 讀取 p-* 輸入
+    Note over C: 初始化 → loadEffects() fetch /api/effects\n成功 → renderEffects() 動態建立特效按鈕（未知特效 generic）\n失敗/空表 → fallback 內建特效\nparamsBtn / connBtn → bindToggle()（展開時 applyFabPos()）
+    C->>C: 選特效 → selectEffect() → renderParams()
+    C->>C: 點擊 → paramsFor() 讀取 rtx-p-* 輸入
     C->>S: POST /api/effect {effect, x, y, params}
     S->>S: _check_key → effect 驗證 → _rate_limit → _broadcast
     S-->>V: SSE event: effect
@@ -158,8 +161,14 @@ classDiagram
     class Console {
         +saveCfg()
         +applyFabPos()
+        +genericFields(params)
+        +fieldDefs(type)
         +renderParams()
-        +bindToggle(btnId, panelId)
+        +selectEffect(type)
+        +renderEffects(meta)
+        +normalizeEffects(data)
+        +loadEffects()
+        +bindToggle(btn, box)
         +headers()
         +paramsFor()
         +post(path, body)
@@ -174,9 +183,9 @@ classDiagram
 
 ```mermaid
 flowchart LR
-    TA["tests/test_api.py<br/>pytest＋TestClient（12）"] --> M["server/main.py"]
+    TA["tests/test_api.py<br/>pytest＋TestClient（13）"] --> M["server/main.py"]
     TE["tests/test_effects.mjs<br/>node --test（13）"] --> S["shared/effects.js"]
-    TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（15）"] --> K["console/app.js"]
+    TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（34）"] --> K["console/app.js"]
 ```
 
 ## 7. 未完成或未接線節點

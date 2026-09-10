@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 ROOT = Path(__file__).resolve().parent.parent
 SHARED_APP_JS = ROOT / "shared" / "app.js"
 SHARED_EFFECTS_JS = ROOT / "shared" / "effects.js"
+CONSOLE_APP_JS = ROOT / "console" / "app.js"
 
 ACCESS_KEY = os.getenv("ACCESS_KEY", "").strip()
 
@@ -175,3 +176,10 @@ async def effects_js():
     if not SHARED_EFFECTS_JS.exists():
         raise HTTPException(status_code=404, detail="shared/effects.js not found")
     return FileResponse(SHARED_EFFECTS_JS, media_type="application/javascript", headers=NO_STORE)
+
+
+@app.get("/console.js")
+async def console_js():
+    if not CONSOLE_APP_JS.exists():
+        raise HTTPException(status_code=404, detail="console/app.js not found")
+    return FileResponse(CONSOLE_APP_JS, media_type="application/javascript", headers=NO_STORE)
