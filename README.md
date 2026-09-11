@@ -99,6 +99,18 @@ python -m pytest tests/ -q
 node --test tests/test_effects.mjs tests/test_console.mjs tests/test_effect_examples.mjs
 ```
 
+瀏覽器 E2E（Playwright）：
+
+```
+npx playwright install chromium
+npx playwright test
+```
+
+- `playwright.config.js` 會自動啟動 `python -m uvicorn server.main:app --port 8123`
+- E2E 預設設定 `SERVE_EXAMPLES=1` 與 `RTX_EFFECTS_MANIFEST=tests/fixtures/effects.json`
+- 目前包含 9 項測試：examples smoke、console→server→viewer flow、effect params
+- 新增特效不納入預設 E2E；若需手動驗證新特效，請使用獨立 config／manual spec
+
 ## 文件維護原則
 
 - 每次改動都需對應一個具描述性的 Git commit。

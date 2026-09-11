@@ -1,0 +1,22 @@
+{
+  "name": "real-time-interaction-html",
+  "version": "1.0.0",
+  "description": "> 本專案使用 `docs/agents` 模板，規範 AI 助理 (Agents) 的協作流程與文件維護標準。",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "example": "examples",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "python -m pytest tests/ -q && node --test tests/test_effects.mjs tests/test_console.mjs tests/test_effect_examples.mjs",
+    "test:e2e": "playwright test"
+  },
+  "keywords": [],
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^22.20.2"
+  }
+}
