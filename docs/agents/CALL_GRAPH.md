@@ -239,7 +239,7 @@ flowchart LR
     TE["tests/test_effects.mjs<br/>node --test＋vm（17）"] --> S["viewer/effects.js ＋ effects/*/viewer.js"]
     TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（51）"] --> K["console/app.js ＋ effects/*/console.js"]
     TX["tests/test_effect_examples.mjs<br/>node --test＋vm fake sandbox（16）"] --> X["examples/effects/*/effects.json ＋ viewer.js ＋ console.js"]
-    TP["e2e/*.spec.js<br/>Playwright E2E（9）<br/>自動啟動 uvicorn port 8123<br/>RTX_EFFECTS_MANIFEST → tests/fixtures/effects.json"] --> M
+    TP["tests/e2e/*.spec.js<br/>Playwright E2E（9）<br/>自動啟動 uvicorn port 8123<br/>RTX_EFFECTS_MANIFEST → tests/fixtures/effects.json"] --> M
     TP --> K
     TP --> S
     TP --> TF

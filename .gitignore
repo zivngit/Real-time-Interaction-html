@@ -4,6 +4,7 @@
 *.pyproj
 *.pyperf
 **/__pycache__/
+.pytest_cache/
 .venv/
 docs/temp
 .env

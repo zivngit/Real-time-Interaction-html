@@ -47,6 +47,8 @@
 - [x] console：console 插件 icon 改為 `iconID`／`iconSVG` 兩個欄位（解析優先序 plugin `iconSVG` → plugin `iconID` → manifest `icon` → `RTX_EFFECT_ICONS[type]` → `RTX_EFFECT_ICONS.generic` → 內建 fallback icon；有效 `iconSVG`／`iconID` 優先於 manifest `icon` 且不標記 `generic`；舊 `icon` 欄位不再讀取；particle／ripple／text 改用 `iconID`，sample-burst 示範 `iconID`＋`iconSVG` 且 render 改依 `api.fields` 迭代、effect-interface 只示範 `iconSVG` 且 render 建立 `rtx-p-duration`；HOW_TO_ADD_EFFECT.md 第 8 節改寫為 `iconID`／`iconSVG` 並新增 8.1 server params 傳遞說明（`paramsFor()`、`rtx-p-<key>` id、各型別輸入項與送 server 行為）；tests/test_console.mjs 再增 2 項，共 51 項）（2026-09-10）
 - [x] effects：自動測試改用 `tests/fixtures/effects.json`（`tests/test_api.py` 以 `RTX_EFFECTS_MANIFEST` 指向測試 manifest；正式 `effects/effects.json` 可加入新特效但不自動進入測試）（2026-09-11）
 - [x] browser E2E：Playwright 自動啟動 uvicorn（port 8123、`SERVE_EXAMPLES=1`、`RTX_EFFECTS_MANIFEST=tests/fixtures/effects.json`），驗證 examples smoke、console→server→viewer flow、effect params（9 項）（2026-09-11）
+- [x] README：改以專案特色、系統架構、目錄結構、嵌入方式與測試說明為主，減少 AI 協作流程說明；`.gitignore` 補上 `.pytest_cache/`（2026-09-11）
+- [x] 測試結構整理：`e2e/` 移至 `tests/e2e/`、`conftest.py` 移至 `tests/conftest.py` 並補 `sys.path`；`playwright.config.js` 改為 `testDir: "./tests/e2e"`；`package.json test:unit` 加 Python dependency preflight（2026-09-11）
 - [ ] server 斷線重播暫存（最近 N 則）
 - [ ] viewer 狀態回報（POST /api/status）
 - [ ] 多 viewer 負載／效能測試
