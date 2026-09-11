@@ -49,6 +49,8 @@
 - [x] browser E2E：Playwright 自動啟動 uvicorn（port 8123、`SERVE_EXAMPLES=1`、`RTX_EFFECTS_MANIFEST=tests/fixtures/effects.json`），驗證 examples smoke、console→server→viewer flow、effect params（9 項）（2026-09-11）
 - [x] README：改以專案特色、系統架構、目錄結構、嵌入方式與測試說明為主，減少 AI 協作流程說明；`.gitignore` 補上 `.pytest_cache/`（2026-09-11）
 - [x] 測試結構整理：`e2e/` 移至 `tests/e2e/`、`conftest.py` 移至 `tests/conftest.py` 並補 `sys.path`；`playwright.config.js` 改為 `testDir: "./tests/e2e"`；`package.json test:unit` 加 Python dependency preflight（2026-09-11）
+- [x] server 重構：`server/main.py` 只保留 app／middleware／API 與資源路由；`config`、`security`、`params`、`relay`、`static_files` 拆離為獨立模組；`normalize_params` 接受 effects catalog；`tests/test_api.py` 改 patch `main.broadcast` 與 `relay._subscribers`（2026-09-11）
+- [ ] 處理 pytest 的 2 個第三方 deprecation warnings：評估加入 `httpx2` 並限制 `anyio>=4.10,<4.15`（已用 temp dependencies 驗證可消除 warnings；2026-09-11 暫不處理）
 - [ ] server 斷線重播暫存（最近 N 則）
 - [ ] viewer 狀態回報（POST /api/status）
 - [ ] 多 viewer 負載／效能測試

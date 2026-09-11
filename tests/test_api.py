@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 os.environ["RTX_EFFECTS_MANIFEST"] = str(Path(__file__).resolve().parent / "fixtures" / "effects.json")
 
 import server.main as m
+import server.relay as relay
 
 
 def _free_port() -> int:
@@ -26,14 +27,14 @@ def _free_port() -> int:
 @pytest.fixture()
 def client(monkeypatch):
     monkeypatch.setattr(m, "ACCESS_KEY", "")
-    m._rate_window.clear()
+    m.rate_limiter.reset()
     with TestClient(m.app) as tc:
         yield tc
 
 
 @pytest.fixture()
 def live_server():
-    m._rate_window.clear()
+    m.rate_limiter.reset()
     port = _free_port()
     config = uvicorn.Config("server.main:app", host="127.0.0.1", port=port, log_level="warning")
     server = uvicorn.Server(config)
@@ -154,7 +155,7 @@ def test_effect_bad_coords(client):
 @pytest.fixture()
 def capture_broadcast(client, monkeypatch):
     captured = []
-    monkeypatch.setattr(m, "_broadcast", lambda msg: captured.append(msg))
+    monkeypatch.setattr(m, "broadcast", lambda msg: captured.append(msg))
     return captured
 
 
@@ -328,7 +329,7 @@ def test_legacy_asset_routes_removed(client):
 
 def test_rate_limit(client, monkeypatch):
     monkeypatch.setattr(m, "RATE_LIMIT_PER_SEC", 3)
-    m._rate_window.clear()
+    m.rate_limiter.reset()
     for _ in range(3):
         assert client.post("/api/effect", json={"effect": "ripple", "x": 1, "y": 1}).status_code == 200
     r = client.post("/api/effect", json={"effect": "ripple", "x": 1, "y": 1})
@@ -399,7 +400,7 @@ def test_sse_receives_effect_and_clear(live_server):
     }
     assert ev[1]["id"]
     time.sleep(1.0)
-    assert len(m._subscribers) == 0
+    assert len(relay._subscribers) == 0
 
 
 def test_sse_access_key(live_server, monkeypatch):

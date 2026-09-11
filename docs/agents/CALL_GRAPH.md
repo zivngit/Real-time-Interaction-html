@@ -7,7 +7,7 @@
 ```mermaid
 flowchart LR
     C["examples/embed-console.html（＋embed-both.html）<br/>console/icons.js + console/app.js + console/style.css<br/>（選用載入 /effects/{id}/console.js 插件）"]
-    S["server/main.py<br/>server/effects.py（FastAPI）<br/>effects/effects.json（manifest，可被 RTX_EFFECTS_MANIFEST 覆寫）"]
+    S["server/main.py（app／routes）<br/>server/config.py + security.py + params.py + relay.py + static_files.py<br/>server/effects.py（FastAPI）<br/>effects/effects.json（manifest，可被 RTX_EFFECTS_MANIFEST 覆寫）"]
     V["examples/embed-viewer.html（＋embed-both.html）<br/>viewer/app.js（Effects 未載入時動態載入 viewer/effects.js<br/>載入 /api/effects 後動態載入各 /effects/{id}/viewer.js）"]
     E["examples/index.html<br/>（demo／showcase 索引，opt-in：SERVE_EXAMPLES=1）"]
     LS[("localStorage<br/>rtx.srvUrl / rtx.srvKey")]
@@ -43,21 +43,21 @@ flowchart TD
     end
 
     subgraph guard["驗證"]
-        CK["_check_key（X-Access-Key / ?key）"]
+        CK["check_key（server/security.py；X-Access-Key / ?key）"]
         VE{"effect 在 EFFECTS 中？"}
-        NP["normalize_params（schema 驗證，無效值回退預設）"]
-        RL["_rate_limit（滑動視窗 20/s）"]
-        EN{"SERVE_EXAMPLES 啟用？"}
-        EP{"effect_id 合法＋檔案存在？"}
+        NP["normalize_params（server/params.py；schema 驗證，無效值回退預設）"]
+        RL["RateLimiter.check（server/relay.py；滑動視窗 20/s）"]
+        EN{"examples_enabled（server/static_files.py）：SERVE_EXAMPLES 啟用？"}
+        EP{"effect_asset（server/static_files.py）：effect_id 合法＋檔案存在？"}
     end
 
     subgraph push["廣播 / SSE 串流"]
-        BC["_broadcast：put_nowait 至各訂閱 queue"]
-        SUB["_subscribers.add(queue)"]
-        GEN["generate（循環）：retry: 3000 → queue.get(timeout=15s)"]
+        BC["broadcast（server/relay.py）：put_nowait 至各訂閱 queue"]
+        SUB["add_subscriber（server/relay.py）：_subscribers.add(queue)"]
+        GEN["event_stream（server/relay.py）：retry: 3000 → queue.get(timeout=15s)"]
         PING["yield event: ping（心跳）"]
         MSG["yield event: effect / clear"]
-        DIS["_subscribers.discard(queue)（finally）"]
+        DIS["remove_subscriber（server/relay.py）：_subscribers.discard(queue)（finally）"]
     end
 
     subgraph err["錯誤回應"]
@@ -72,7 +72,7 @@ flowchart TD
         direction LR
         OK["200 {ok, ts}"]
         LOK["200 EFFECTS 目錄"]
-        FR["FileResponse（no-store）"]
+        FR["FileResponse（server/static_files.py；no-store）"]
     end
 
     PE --> CK
@@ -117,7 +117,7 @@ sequenceDiagram
     C->>C: 選特效 → selectEffect() → renderParams()
     C->>C: 點擊 → paramsFor() 讀取 rtx-p-* 輸入
     C->>S: POST /api/effect {effect, x, y, params}
-    S->>S: _check_key → effect 驗證 → normalize_params（schema 驗證）→ _rate_limit → _broadcast
+    S->>S: check_key → effect 驗證 → normalize_params（schema 驗證）→ RateLimiter.check → broadcast
     S-->>V: SSE event: effect
     V->>V: handleEffect：Effects.toPixels → Effects.createEffect → born/elapsed
     V->>V: spawn → tick（rAF＋setInterval 100ms）
@@ -186,14 +186,43 @@ classDiagram
         +MANIFEST
         +EFFECTS
     }
+    class ServerConfig {
+        <<server/config.py>>
+        +ACCESS_KEY
+        +RATE_LIMIT_PER_SEC
+    }
+    class Security {
+        <<server/security.py>>
+        +check_key()
+    }
+    class Params {
+        <<server/params.py>>
+        +normalize_params(effect_id, raw, effects)
+    }
+    class Relay {
+        <<server/relay.py>>
+        +add_subscriber(queue)
+        +remove_subscriber(queue)
+        +broadcast(msg)
+        +event_stream(queue, is_disconnected)
+    }
+    class RateLimiter {
+        <<server/relay.py>>
+        +reset()
+        +check(limit_per_sec)
+    }
+    class StaticFiles {
+        <<server/static_files.py>>
+        +file_response(path, media_type, detail)
+        +effect_asset(effect_id, filename)
+        +examples_enabled()
+        +examples_response(path)
+    }
     class Server {
+        <<server/main.py>>
         +post_effect()
         +post_clear()
         +stream()
-        +normalize_params(effect_id, raw)
-        +_check_key()
-        +_rate_limit()
-        +_broadcast()
     }
     class Console {
         +saveCfg()
@@ -224,7 +253,14 @@ classDiagram
     Effects ..> Effect : 建立（particle / firework / ripple / text）
     Console ..> ConsolePlugin : 選用 render／iconID／iconSVG（缺失時 schema 渲染／manifest icon）
     Console ..> Server : POST /api/effect / POST /api/clear
-    Server ..> EffectCatalog : 讀取 MANIFEST / EFFECTS
+    Server ..> EffectCatalog : 讀取 EFFECTS / MANIFEST_PATH
+    Server ..> ServerConfig : ACCESS_KEY / RATE_LIMIT_PER_SEC
+    Server ..> Security : check_key()
+    Server ..> Params : normalize_params()
+    Server ..> Relay : add_subscriber / broadcast / event_stream
+    Server ..> RateLimiter : rate_limiter.check()
+    Server ..> StaticFiles : file_response / effect_asset / examples_response
+    Params ..> EffectCatalog : effects 參數缺省時讀取 EFFECTS
     EffectCatalog ..> EffectPlugin : manifest 宣告 /effects/<id>/viewer.js
     Server ..> Viewer : SSE effect / clear / ping
 ```
@@ -234,7 +270,7 @@ classDiagram
 ```mermaid
 flowchart LR
     TF["tests/fixtures/effects.json<br/>測試 manifest（固定原四特效）"]
-    TA["tests/test_api.py<br/>pytest＋TestClient（33）<br/>RTX_EFFECTS_MANIFEST → tests/fixtures/effects.json"] --> M["server/main.py"]
+    TA["tests/test_api.py<br/>pytest＋TestClient（33）<br/>RTX_EFFECTS_MANIFEST → tests/fixtures/effects.json"] --> M["server/main.py<br/>＋server/config.py、security.py、params.py、relay.py、static_files.py、effects.py"]
     TA --> TF
     TE["tests/test_effects.mjs<br/>node --test＋vm（17）"] --> S["viewer/effects.js ＋ effects/*/viewer.js"]
     TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（51）"] --> K["console/app.js ＋ effects/*/console.js"]
