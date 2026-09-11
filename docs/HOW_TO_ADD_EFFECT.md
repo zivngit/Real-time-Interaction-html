@@ -172,4 +172,6 @@ python -m pytest tests/ -q
 node --test tests/test_effects.mjs tests/test_console.mjs tests/test_effect_examples.mjs
 ```
 
+測試 manifest：`tests/test_api.py` 會設定 `RTX_EFFECTS_MANIFEST` 指向 `tests/fixtures/effects.json`（固定原四特效：particle／ripple／firework／text），因此正式 `effects/effects.json` 中加入的新特效不會自動進入自動測試。若要把新特效納入測試，需另行加入 `tests/fixtures/effects.json` 與對應 node 測試。
+
 手動驗收（需 `SERVE_EXAMPLES=1` 啟用示範頁）：啟動 server 後於 `http://localhost:8000/examples/embed-console.html` 選取新特效、調整參數並點擊畫面，確認 `embed-viewer.html` 渲染符合預期。

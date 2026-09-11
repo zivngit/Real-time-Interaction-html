@@ -1,12 +1,16 @@
 import json
+import os
 import socket
 import threading
 import time
+from pathlib import Path
 
 import httpx
 import pytest
 import uvicorn
 from fastapi.testclient import TestClient
+
+os.environ["RTX_EFFECTS_MANIFEST"] = str(Path(__file__).resolve().parent / "fixtures" / "effects.json")
 
 import server.main as m
 

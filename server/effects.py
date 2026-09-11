@@ -1,10 +1,11 @@
 import json
+import os
 import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 EFFECTS_DIR = ROOT / "effects"
-MANIFEST_PATH = EFFECTS_DIR / "effects.json"
+MANIFEST_PATH = Path(os.environ.get("RTX_EFFECTS_MANIFEST", str(EFFECTS_DIR / "effects.json")))
 
 EFFECT_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 PARAM_TYPES = {"integer", "number", "string", "color", "boolean", "select", "array"}

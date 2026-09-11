@@ -64,6 +64,8 @@ python -m uvicorn server.main:app --port 8000   # server 中繼（專案根目�
 
 新增特效：在 `effects/effects.json` 加一個 entry ＋ 建立 `effects/<id>/viewer.js` 即可；server／console 程式碼不需修改。詳見 `docs/HOW_TO_ADD_EFFECT.md`；完整範例參考 `examples/effects/sample-burst/`、最小介面參考 `examples/effects/effect-interface/`（兩者非正式 manifest）。
 
+自動測試使用 `tests/fixtures/effects.json`（固定原四特效：particle／ripple／firework／text）；`tests/test_api.py` 會以環境變數 `RTX_EFFECTS_MANIFEST` 指向該 fixture。生產 server 預設仍讀 `effects/effects.json`；新特效加入正式 manifest 後不會自動進入測試。
+
 ## 嵌入示範頁（examples，opt-in）
 
 `examples/` 提供宿主網頁嵌入示範頁（viewer／console／兩者），**預設停用**；須設定環境變數 `SERVE_EXAMPLES=1`（接受 `1`／`true`／`yes`，不分大小寫）並重新啟動 server：

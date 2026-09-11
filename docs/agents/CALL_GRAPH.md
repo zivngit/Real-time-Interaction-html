@@ -7,7 +7,7 @@
 ```mermaid
 flowchart LR
     C["examples/embed-console.html（＋embed-both.html）<br/>console/icons.js + console/app.js + console/style.css<br/>（選用載入 /effects/{id}/console.js 插件）"]
-    S["server/main.py<br/>server/effects.py（FastAPI）<br/>effects/effects.json（manifest）"]
+    S["server/main.py<br/>server/effects.py（FastAPI）<br/>effects/effects.json（manifest，可被 RTX_EFFECTS_MANIFEST 覆寫）"]
     V["examples/embed-viewer.html（＋embed-both.html）<br/>viewer/app.js（Effects 未載入時動態載入 viewer/effects.js<br/>載入 /api/effects 後動態載入各 /effects/{id}/viewer.js）"]
     E["examples/index.html<br/>（demo／showcase 索引，opt-in：SERVE_EXAMPLES=1）"]
     LS[("localStorage<br/>rtx.srvUrl / rtx.srvKey")]
@@ -233,7 +233,9 @@ classDiagram
 
 ```mermaid
 flowchart LR
-    TA["tests/test_api.py<br/>pytest＋TestClient（33）"] --> M["server/main.py"]
+    TF["tests/fixtures/effects.json<br/>測試 manifest（固定原四特效）"]
+    TA["tests/test_api.py<br/>pytest＋TestClient（33）<br/>RTX_EFFECTS_MANIFEST → tests/fixtures/effects.json"] --> M["server/main.py"]
+    TA --> TF
     TE["tests/test_effects.mjs<br/>node --test＋vm（17）"] --> S["viewer/effects.js ＋ effects/*/viewer.js"]
     TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（51）"] --> K["console/app.js ＋ effects/*/console.js"]
     TX["tests/test_effect_examples.mjs<br/>node --test＋vm fake sandbox（16）"] --> X["examples/effects/*/effects.json ＋ viewer.js ＋ console.js"]
