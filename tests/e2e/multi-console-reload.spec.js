@@ -188,6 +188,7 @@ test("multiple consoles with different server URL and key reload independently w
     fs.writeFileSync(manifestPathA, JSON.stringify(manifestA, null, 2) + "\n", "utf8");
 
     await ensurePanelOpen(consoleA);
+    await consoleA.locator("#rtx-conn-btn").click();
     await consoleA.locator("#rtx-reload-btn").click();
     await expect(consoleA.locator("#rtx-fx-particle")).toHaveAttribute("aria-label", RELOADED_A, { timeout: 10000 });
     await expect(consoleA.locator(`#rtx-fx-${REMOVED_A}`)).toHaveCount(0);
@@ -201,6 +202,7 @@ test("multiple consoles with different server URL and key reload independently w
     fs.writeFileSync(manifestPathB, JSON.stringify(manifestB, null, 2) + "\n", "utf8");
 
     await ensurePanelOpen(consoleB);
+    await consoleB.locator("#rtx-conn-btn").click();
     await consoleB.locator("#rtx-reload-btn").click();
     await expect(consoleB.locator("#rtx-fx-particle")).toHaveAttribute("aria-label", RELOADED_B, { timeout: 10000 });
     await expect(consoleB.locator(`#rtx-fx-${REMOVED_B}`)).toHaveCount(0);

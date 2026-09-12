@@ -334,6 +334,43 @@ test("uses external scoped style and unique ids", async () => {
     assert.ok(env.node(id), id);
   }
   assert.ok(env.node("rtx-hint").textContent.includes("/api/effects"));
+  const reloadBtn = env.node("rtx-reload-btn");
+  assert.ok(reloadBtn.closest("#rtx-conn-panel"));
+  assert.ok(reloadBtn.innerHTML.includes("<svg"));
+  assert.equal(reloadBtn.textContent, "");
+});
+
+test("fx buttons use fixed grid layout", async () => {
+  const env = await makeEnv();
+  assert.ok(css.includes("#rtx-fx-buttons { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; max-height: 180px; overflow-y: auto; justify-items: center; align-items: center; }"));
+  assert.equal(env.node("rtx-fx-buttons")._children.length, 4);
+});
+
+function effectsWithCount(count) {
+  const effects = {};
+  for (let i = 1; i <= count; i += 1) {
+    effects[`fx-${String(i).padStart(2, "0")}`] = {
+      label: `Fx ${i}`,
+      params: {},
+    };
+  }
+  return effects;
+}
+
+test("fx buttons are clickable for 1, 8, 20, and 50 effects", async () => {
+  for (const count of [1, 8, 20, 50]) {
+    const env = await makeEnv({ effects: effectsWithCount(count) });
+    const fxButtons = env.node("rtx-fx-buttons");
+    assert.equal(fxButtons._children.length, count, `renders ${count} fx buttons`);
+    for (let i = 0; i < count; i += 1) {
+      const btn = fxButtons._children[i];
+      btn._fire("click");
+      const selected = fxButtons._children.filter((b) => b.classList.contains("selected"));
+      assert.ok(btn.classList.contains("selected"), `${count} fx button ${i} is selected after click`);
+      assert.equal(selected.length, 1, `${count} fx button ${i} keeps a single selected button`);
+      assert.equal(selected[0], btn, `${count} fx button ${i} is the selected button`);
+    }
+  }
 });
 
 test("does not initialize twice", async () => {
@@ -383,10 +420,12 @@ test("uses external icons.js for console UI icons", async () => {
   assert.ok(env.win.RTX_UI_ICONS.fabClose);
   assert.ok(env.win.RTX_UI_ICONS.params);
   assert.ok(env.win.RTX_UI_ICONS.conn);
+  assert.ok(env.win.RTX_UI_ICONS.reload);
   assert.ok(env.win.RTX_UI_ICONS.clear);
   assert.ok(env.node("rtx-fab").innerHTML.includes("<svg"));
   assert.ok(env.node("rtx-params-btn").innerHTML.includes("<svg"));
   assert.ok(env.node("rtx-conn-btn").innerHTML.includes("<svg"));
+  assert.ok(env.node("rtx-reload-btn").innerHTML.includes("<svg"));
   assert.ok(env.node("rtx-clear-btn").innerHTML.includes("<svg"));
 });
 

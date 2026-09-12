@@ -7,7 +7,7 @@
 - **可嵌入 viewer**：只要一行 `<script>` 即可在任意網頁加上即時特效顯示層，canvas 不擋宿主網頁操作。
 - **可嵌入 console**：以浮動按鈕＋面板控制特效，支援選特效、調參數、清屏、拖曳移動位置。
 - **manifest 驅動特效**：特效清單集中在 `effects/effects.json`；新增特效主要新增 manifest entry 與 `effects/<id>/viewer.js`，不需改 server／console 核心。
-- **manifest 手動重載**：`POST /api/effects/reload` 重新讀取 manifest 與插件 fingerprint；viewer 透過 SSE `manifest` 自動更新，console 以手動「重載」或頁面重新整理套用。
+- **manifest 手動重載**：`POST /api/effects/reload` 重新讀取 manifest 與插件 fingerprint；viewer 透過 SSE `manifest` 自動更新，console 於［連線設定］展開後點「重載」或頁面重新整理套用。
 - **params schema 驗證**：server 依 manifest 參數型別驗證，無效值回退預設值。
 - **多 viewer 廣播**：console 送出事件後，server 以 SSE 推送給所有已連線 viewer。
 - **相對座標**：使用 viewport 0–100 百分比座標，viewer 自行換算成 canvas 像素。
@@ -41,7 +41,7 @@ flowchart LR
 4. server 驗證 effect、params、金鑰與限頻後，廣播 SSE 事件。
 5. viewer 收到事件後，在 canvas 疊層上渲染特效。
 6. 使用者點清屏時，console 送出 `POST /api/clear`，viewer 清除目前特效。
-7. manifest 或特效插件變更後，以 `POST /api/effects/reload` 手動重載；viewer 收到 SSE `manifest` 後自動更新插件，console 需點［重載］或重新整理頁面。
+7. manifest 或特效插件變更後，以 `POST /api/effects/reload` 手動重載；viewer 收到 SSE `manifest` 後自動更新插件，console 需展開［連線設定］後點［重載］，或重新整理頁面。
 
 ## 目錄結構
 
@@ -142,7 +142,7 @@ window.CONTROL_CONFIG = {
 };
 ```
 
-console 面板提供［重載］按鈕，手動呼叫 `POST /api/effects/reload` 後重新套用 manifest 與 console 插件。console 不透過 SSE 自動重載；重新整理頁面亦會取得最新 `rev` 與特效清單。
+console 面板於［連線設定］下拉面板內提供 SVG［重載］按鈕，手動呼叫 `POST /api/effects/reload` 後重新套用 manifest 與 console 插件。console 不透過 SSE 自動重載；重新整理頁面亦會取得最新 `rev` 與特效清單。
 
 ## 示範頁（examples，opt-in）
 

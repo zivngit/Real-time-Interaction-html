@@ -20,6 +20,25 @@ test("embed-console loads console and test manifest effects", async ({ page }) =
   expect(errors).toHaveLength(0);
 });
 
+test("embed-console fx buttons use fixed grid layout", async ({ page }) => {
+  const errors = trackPageErrors(page);
+  await openConsolePage(page);
+  await expect(page.locator("#rtx-fx-buttons")).toBeVisible();
+  await expect(page.locator("#rtx-fx-buttons .rtx-fx")).toHaveCount(TEST_EFFECTS.length);
+  const grid = await page.locator("#rtx-fx-buttons").evaluate((el) => {
+    const cs = getComputedStyle(el);
+    return {
+      display: cs.display,
+      columns: cs.gridTemplateColumns.split(" ").filter(Boolean).length,
+      overflowY: cs.overflowY,
+    };
+  });
+  expect(grid.display).toBe("grid");
+  expect(grid.columns).toBe(4);
+  expect(grid.overflowY).toBe("auto");
+  expect(errors).toHaveLength(0);
+});
+
 test("embed-viewer loads canvas and connects to stream", async ({ page }) => {
   const errors = trackPageErrors(page);
   await openViewerPage(page);

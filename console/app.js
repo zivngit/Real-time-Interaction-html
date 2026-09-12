@@ -72,12 +72,6 @@
   connBtn.innerHTML = uiIcon("conn");
   row.appendChild(connBtn);
 
-  var reloadBtn = make("button", "rtx-reload-btn", "rtx-action");
-  reloadBtn.title = "重載特效表";
-  reloadBtn.setAttribute("aria-label", "重載特效表");
-  reloadBtn.textContent = "重載";
-  row.appendChild(reloadBtn);
-
   var clearBtn = make("button", "rtx-clear-btn");
   clearBtn.title = "清屏";
   clearBtn.setAttribute("aria-label", "清屏");
@@ -109,10 +103,22 @@
   keyField.appendChild(keyLabel);
   keyField.appendChild(keyInput);
   connPanel.appendChild(keyField);
+
+  var reloadField = make("div", null, "rtx-field");
+  var reloadLabel = make("label");
+  reloadLabel.textContent = "特效表";
+  var reloadBtn = make("button", "rtx-reload-btn", "rtx-action");
+  reloadBtn.title = "重載特效表";
+  reloadBtn.setAttribute("aria-label", "重載特效表");
+  reloadBtn.innerHTML = uiIcon("reload");
+  reloadField.appendChild(reloadLabel);
+  reloadField.appendChild(reloadBtn);
+  connPanel.appendChild(reloadField);
+
   panel.appendChild(connPanel);
 
   var hint = make("div", "rtx-hint");
-  hint.textContent = "選取特效後，點擊畫面任意位置發送。特效清單載入自 server /api/effects；未知特效以通用樣式與參數顯示。［參數］展開目前特效參數，［連線設定］展開 server 與金鑰設定。點擊左上圓形按鈕可收合/展開面板，按住拖曳可移動位置。狀態僅記錄於 console。";
+  hint.textContent = "選取特效後，點擊畫面任意位置發送。特效清單載入自 server /api/effects；未知特效以通用樣式與參數顯示。［參數］展開目前特效參數，［連線設定］展開 server、金鑰與特效表重載。點擊左上圓形按鈕可收合/展開面板，按住拖曳可移動位置。狀態僅記錄於 console。";
   panel.appendChild(hint);
 
   urlInput.value = srvUrl;

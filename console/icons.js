@@ -12,6 +12,7 @@
     fabClose: "<svg class='rtx-icon-close' viewBox='0 0 24 24' aria-hidden='true'><line x1='6' y1='6' x2='18' y2='18'/><line x1='18' y1='6' x2='6' y2='18'/></svg>",
     params: "<svg viewBox='0 0 24 24' aria-hidden='true'><line x1='4' y1='8' x2='20' y2='8'/><line x1='4' y1='16' x2='20' y2='16'/><circle cx='9' cy='8' r='2.2'/><circle cx='15' cy='16' r='2.2'/></svg>",
     conn: "<svg viewBox='0 0 24 24' aria-hidden='true'><rect x='4' y='5' width='16' height='6' rx='1.5'/><rect x='4' y='13' width='16' height='6' rx='1.5'/><circle cx='8' cy='8' r='1'/><circle cx='8' cy='16' r='1'/></svg>",
+    reload: "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M20 12a8 8 0 1 1-2.35-5.65'/><polyline points='20 4 20 8 16 8'/></svg>",
     clear: "<svg viewBox='0 0 24 24' aria-hidden='true'><line x1='5' y1='7' x2='19' y2='7'/><line x1='9' y1='7' x2='9' y2='5'/><line x1='15' y1='7' x2='15' y2='5'/><line x1='9' y1='5' x2='15' y2='5'/><line x1='6' y1='7' x2='7' y2='19'/><line x1='18' y1='7' x2='17' y2='19'/><line x1='7' y1='19' x2='17' y2='19'/></svg>"
   };
 })();

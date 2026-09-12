@@ -9,6 +9,7 @@
 #rtx-panel { position: fixed; left: 12px; top: 66px; z-index: 2147483646; background: rgba(20, 26, 32, 0.92); color: #dfe7ee; border: 1px solid #2c3a46; border-radius: 10px; padding: 12px 14px; width: 280px; box-shadow: 0 6px 24px rgba(0,0,0,0.4); user-select: none; opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity 0.15s ease, transform 0.15s ease; }
 #rtx-panel.open { opacity: 1; transform: none; pointer-events: auto; }
 #rtx-panel h1 { font-size: 13px; margin: 0 0 10px; color: #8fb6d9; letter-spacing: 1px; }
+#rtx-fx-buttons { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; max-height: 180px; overflow-y: auto; justify-items: center; align-items: center; }
 .rtx-row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .rtx-fx { width: 52px; height: 52px; border-radius: 50%; padding: 0; background: #1b2530; border: 1px solid #33475a; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .rtx-fx svg { width: 26px; height: 26px; stroke: #dfe7ee; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; }
@@ -21,8 +22,6 @@
 .rtx-action:hover { border-color: #4d6a86; background: #22303d; }
 .rtx-action.active { background: #2d4a66; border-color: #6ea3d8; }
 .rtx-action.active svg { stroke: #fff; }
-#rtx-reload-btn { font-size: 11px; color: #9fb4c6; }
-#rtx-reload-btn:hover { color: #fff; }
 #rtx-reload-btn:disabled { opacity: 0.6; cursor: default; }
 #rtx-clear-btn { width: 34px; height: 34px; border-radius: 50%; padding: 0; background: #3a2026; border: 1px solid #6e3a44; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 #rtx-clear-btn svg { width: 17px; height: 17px; stroke: #ff9b9b; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; }

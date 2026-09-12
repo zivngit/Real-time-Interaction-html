@@ -172,6 +172,7 @@ test("viewer auto-updates manifest; consoles require manual reload or refresh", 
 
     await ensurePanelOpen(consoleA);
     await new Promise((resolve) => setTimeout(resolve, 1100));
+    await consoleA.locator("#rtx-conn-btn").click();
     await consoleA.locator("#rtx-reload-btn").click();
     await consoleA.locator("#rtx-fx-firework").waitFor({ state: "detached", timeout: 10000 });
     await expect(consoleA.locator("#rtx-fx-particle")).toHaveCount(1);

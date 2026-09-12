@@ -54,6 +54,9 @@
 - [x] effects manifest 多 Console E2E：新增 `tests/e2e/multi-console-reload.spec.js`，以兩個獨立 uvicorn server、不同 port／manifest／`ACCESS_KEY`，驗證不同 server URL / key 的多 Console 端各自手動重載、被移除 effect 的 selected fallback 且互不影響；Playwright E2E 更新為 11 項（2026-09-12）
 - [x] 重新核對 effects manifest reload 實作與 SPEC 第 13 節修正記錄：功能行為一致；更新 `A-10` cache header、`Q-01` temp manifest 覆蓋範圍、`MC-01` selected fallback 的完成狀態措辭（2026-09-12）
 - [x] POST 存取金鑰改為 header-only：`POST /api/effects/reload`、`POST /api/effect`、`POST /api/clear` 移除 `?key=` query fallback，僅接受 `X-Access-Key` header；SSE `GET /api/stream` 維持 `?key=`（2026-09-12）
+- [x] console［重載］改為 SVG 圖示並移入［連線設定］下拉面板；更新 console vm 測試與 Playwright reload E2E（2026-09-12）
+- [x] console 特效按鈕布局改為 4 欄固定 grid；更新 console vm 測試與 Playwright layout E2E（2026-09-12）
+- [x] console 特效按鈕 1/8/20/50 可點擊測試：新增 node vm 測試與 Playwright E2E；`#rtx-fx-buttons` 增加 `max-height: 180px` 與 `overflow-y: auto`，確保 50 個特效按鈕可滾動並逐一點擊（2026-09-12）
 - [ ] 處理 pytest 的 2 個第三方 deprecation warnings：評估加入 `httpx2` 並限制 `anyio>=4.10,<4.15`（已用 temp dependencies 驗證可消除 warnings；2026-09-11 暫不處理）
 - [ ] server 斷線重播暫存（最近 N 則）
 - [ ] viewer 狀態回報（POST /api/status）
