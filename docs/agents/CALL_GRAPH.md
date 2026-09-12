@@ -6,11 +6,12 @@
 
 ```mermaid
 flowchart LR
-    C["examples/embed-console.html（＋embed-both.html）<br/>console/icons.js + console/app.js + console/style.css<br/>（選用載入 /effects/{id}/console.js 插件）"]
+    C["examples/embed-console.html（＋embed-both.html）<br/>console/icons.js + console/app.js + console/style.css<br/>examples/theme.css + examples/theme.js<br/>（選用載入 /effects/{id}/console.js 插件）"]
     S["server/main.py（app／routes）<br/>server/config.py + security.py + params.py + relay.py + static_files.py<br/>server/effects.py（FastAPI）<br/>effects/effects.json（manifest，可被 RTX_EFFECTS_MANIFEST 覆寫）"]
-    V["examples/embed-viewer.html（＋embed-both.html）<br/>viewer/app.js（Effects 未載入時動態載入 viewer/effects.js<br/>載入 /api/effects 後動態載入各 /effects/{id}/viewer.js）"]
-    E["examples/index.html<br/>（demo／showcase 索引，opt-in：SERVE_EXAMPLES=1）"]
+    V["examples/embed-viewer.html（＋embed-both.html）<br/>viewer/app.js（Effects 未載入時動態載入 viewer/effects.js<br/>載入 /api/effects 後動態載入各 /effects/{id}/viewer.js）<br/>examples/theme.css + examples/theme.js"]
+    E["examples/index.html＋theme.css/theme.js<br/>（demo／showcase 索引，opt-in：SERVE_EXAMPLES=1）"]
     LS[("localStorage<br/>rtx.srvUrl / rtx.srvKey")]
+    ET[("localStorage<br/>examples-theme")]
     C -->|"POST /api/effect、POST /api/clear、POST /api/effects/reload"| S
     C -->|"GET /api/effects"| S
     C -->|"GET /console/style.css、/console/icons.js、/console/app.js (no-store)"| S
@@ -22,6 +23,9 @@ flowchart LR
     E -->|"連結 embed-*.html"| C
     E -->|"連結 embed-*.html"| V
     LS -.-> C
+    ET -.-> C
+    ET -.-> V
+    ET -.-> E
 ```
 
 ## 2. server 路由與請求驗證

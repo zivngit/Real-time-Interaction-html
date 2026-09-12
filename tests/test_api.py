@@ -586,6 +586,8 @@ def test_examples_disabled_by_default(client, monkeypatch):
         "/examples/embed-viewer.html",
         "/examples/embed-console.html",
         "/examples/embed-both.html",
+        "/examples/theme.css",
+        "/examples/theme.js",
     ):
         assert client.get(route).status_code == 404
 
@@ -600,6 +602,9 @@ def test_examples_enabled_when_serve_examples_set(client, monkeypatch):
         assert name in r.text
     assert "/viewer/index.html" not in r.text
     assert "/console/index.html" not in r.text
+    for theme_asset in ("/examples/theme.css", "/examples/theme.js"):
+        assert theme_asset in r.text
+        assert client.get(theme_asset).status_code == 200
     r = client.get("/examples/embed-viewer.html")
     assert r.status_code == 200
     assert "/viewer/app.js" in r.text

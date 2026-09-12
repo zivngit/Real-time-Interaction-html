@@ -74,6 +74,8 @@ project/
 │   ├── embed-viewer.html
 │   ├── embed-console.html
 │   ├── embed-both.html
+│   ├── theme.css            # examples 淺色／深色主題
+│   ├── theme.js             # examples 主題切換與 localStorage 記憶
 │   └── effects/             # sample-burst、effect-interface 參考範例
 ├── tests/                   # 自動化測試
 │   ├── conftest.py          # pytest path 設定
@@ -168,6 +170,8 @@ set SERVE_EXAMPLES=1 && python -m uvicorn server.main:app --port 8000
 - `http://localhost:8000/examples/embed-console.html`
 - `http://localhost:8000/examples/embed-both.html`
 
+各示範頁右上角提供淺色／深色主題切換；選擇會儲存在 `localStorage`，未手動切換時跟随系統偏好。
+
 ## 特效插件
 
 正式特效清單位於 `effects/effects.json`。目前正式 manifest 包含 8 個特效：
@@ -239,7 +243,7 @@ npx playwright test
 npm run test
 ```
 
-目前測試數量：pytest 41 項、node 86 項（`test_console` 52、`test_effect_examples` 16、`test_effects` 18）、Playwright E2E 11 項。
+目前測試數量：pytest 41 項、node 88 項（`test_console` 54、`test_effect_examples` 16、`test_effects` 18）、Playwright E2E 14 項。
 
 Playwright E2E 會自動啟動 server（port `8123`），並使用 `tests/fixtures/effects.json`，因此預設不會把新特效納入測試。`tests/e2e/reload-manifest.spec.js` 會另啟獨立 server 與 temp manifest，驗證 viewer 自動更新與 console 手動重載／重新整理。`tests/e2e/multi-console-reload.spec.js` 會另啟兩個獨立 server、temp manifest 與不同 `ACCESS_KEY`，驗證不同 server URL / key 的多 Console 端各自重載、被移除 effect 的 selected fallback，且互不影響。
 
