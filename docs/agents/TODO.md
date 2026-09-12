@@ -57,6 +57,7 @@
 - [x] console［重載］改為 SVG 圖示並移入［連線設定］下拉面板；更新 console vm 測試與 Playwright reload E2E（2026-09-12）
 - [x] console 特效按鈕布局改為 4 欄固定 grid；更新 console vm 測試與 Playwright layout E2E（2026-09-12）
 - [x] console 特效按鈕 1/8/20/50 可點擊測試：新增 node vm 測試與 Playwright E2E；`#rtx-fx-buttons` 增加 `max-height: 180px` 與 `overflow-y: auto`，確保 50 個特效按鈕可滾動並逐一點擊（2026-09-12）
+- [x] console 特效按鈕滑動條樣式：`#rtx-fx-buttons` 增加 themed scrollbar（`scrollbar-width`／`scrollbar-color` 與 WebKit scrollbar pseudo-elements），並更新 console vm 測試（2026-09-12）
 - [ ] 處理 pytest 的 2 個第三方 deprecation warnings：評估加入 `httpx2` 並限制 `anyio>=4.10,<4.15`（已用 temp dependencies 驗證可消除 warnings；2026-09-11 暫不處理）
 - [ ] server 斷線重播暫存（最近 N 則）
 - [ ] viewer 狀態回報（POST /api/status）

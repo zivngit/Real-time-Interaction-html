@@ -342,7 +342,11 @@ test("uses external scoped style and unique ids", async () => {
 
 test("fx buttons use fixed grid layout", async () => {
   const env = await makeEnv();
-  assert.ok(css.includes("#rtx-fx-buttons { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; max-height: 180px; overflow-y: auto; justify-items: center; align-items: center; }"));
+  assert.ok(css.includes("#rtx-fx-buttons { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; max-height: 180px; overflow-y: auto; justify-items: center; align-items: center; scrollbar-width: thin; scrollbar-color: #33475a transparent; }"));
+  assert.ok(css.includes("#rtx-fx-buttons::-webkit-scrollbar { width: 8px; }"));
+  assert.ok(css.includes("#rtx-fx-buttons::-webkit-scrollbar-track { background: transparent; }"));
+  assert.ok(css.includes("#rtx-fx-buttons::-webkit-scrollbar-thumb { background: #33475a; border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }"));
+  assert.ok(css.includes("#rtx-fx-buttons::-webkit-scrollbar-thumb:hover { background: #4d6a86; border: 2px solid transparent; background-clip: content-box; }"));
   assert.equal(env.node("rtx-fx-buttons")._children.length, 4);
 });
 
