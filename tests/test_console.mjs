@@ -200,18 +200,32 @@ async function makeEnv(opts = {}) {
     },
   };
 
+  const reloadJson = opts.reloadJson ?? { ok: true, changed: false, rev: "", effects: [] };
+  const reloadOk = opts.reloadOk !== false;
+  const reloadStatus = opts.reloadStatus ?? 200;
+  const reloadFail = Boolean(opts.reloadFail);
+  let currentEffectsJson = effectsJson;
   const fetch = async (url, options = {}) => {
     fetchCalls.push({ url, opts: options });
+    if (url.endsWith("/api/effects/reload")) {
+      if (reloadFail) throw new Error("reload down");
+      return {
+        ok: reloadOk,
+        status: reloadStatus,
+        json: async () => reloadJson,
+        text: async () => JSON.stringify(reloadJson),
+      };
+    }
     if (url.endsWith("/api/effects")) {
       if (effectsFail) throw new Error("network down");
       return {
         ok: effectsOk,
         status: effectsStatus,
-        json: async () => effectsJson,
-        text: async () => JSON.stringify(effectsJson),
+        json: async () => currentEffectsJson,
+        text: async () => JSON.stringify(currentEffectsJson),
       };
     }
-    return { ok: true, status: 200, text: async () => "" };
+    return { ok: true, status: 200, text: async () => "", json: async () => ({ ok: true, changed: false, rev: "", effects: [] }) };
   };
 
   const window = {
@@ -263,6 +277,9 @@ async function makeEnv(opts = {}) {
     win: window,
     fireWindow: (t, evt) => (windowListeners[t] || []).slice().forEach((fn) => fn(evt)),
     runAgain: () => vm.runInContext(src, sandbox),
+    setEffectsJson: (payload) => {
+      currentEffectsJson = payload;
+    },
   };
 }
 
@@ -305,6 +322,7 @@ test("uses external scoped style and unique ids", async () => {
     "rtx-fx-buttons",
     "rtx-params-btn",
     "rtx-conn-btn",
+    "rtx-reload-btn",
     "rtx-clear-btn",
     "rtx-params-panel",
     "rtx-params-body",
@@ -557,6 +575,30 @@ test("loads console plugins from consoleUrl and falls back to schema render", as
   env.node("rtx-fx-particle")._fire("click");
   assert.ok(env.node("rtx-p-count"));
   assert.ok(env.node("rtx-p-color"));
+});
+
+test("manual reload button posts reload and applies changed manifest", async () => {
+  const env = await makeEnv({
+    effectsJson: { effects: DEFAULT_EFFECTS },
+    reloadJson: { ok: true, changed: true, rev: "rev-2", effects: ["particle", "ripple", "text"] },
+  });
+  const reloadBtn = env.node("rtx-reload-btn");
+  assert.ok(reloadBtn);
+  const reloaded = {
+    particle: { ...DEFAULT_EFFECTS.particle, label: "Reloaded Particle" },
+    ripple: DEFAULT_EFFECTS.ripple,
+    text: DEFAULT_EFFECTS.text,
+  };
+  env.setEffectsJson({ rev: "rev-2", effects: reloaded });
+  reloadBtn._fire("click");
+  await new Promise((r) => setTimeout(r, 50));
+  const reloadCall = env.fetchCalls.find((c) => c.url.endsWith("/api/effects/reload"));
+  assert.ok(reloadCall);
+  assert.equal(reloadCall.opts.method, "POST");
+  const fxButtons = env.node("rtx-fx-buttons");
+  assert.ok(!fxButtons._children.some((c) => c._id === "rtx-fx-firework"));
+  assert.ok(fxButtons._children.some((c) => c._id === "rtx-fx-particle"));
+  assert.ok(env.scriptLoads[env.scriptLoads.length - 1].includes("?v=rev-2"));
 });
 
 test("console plugin load failure keeps schema rendering", async () => {

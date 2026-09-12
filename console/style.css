@@ -21,6 +21,9 @@
 .rtx-action:hover { border-color: #4d6a86; background: #22303d; }
 .rtx-action.active { background: #2d4a66; border-color: #6ea3d8; }
 .rtx-action.active svg { stroke: #fff; }
+#rtx-reload-btn { font-size: 11px; color: #9fb4c6; }
+#rtx-reload-btn:hover { color: #fff; }
+#rtx-reload-btn:disabled { opacity: 0.6; cursor: default; }
 #rtx-clear-btn { width: 34px; height: 34px; border-radius: 50%; padding: 0; background: #3a2026; border: 1px solid #6e3a44; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 #rtx-clear-btn svg { width: 17px; height: 17px; stroke: #ff9b9b; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; }
 #rtx-clear-btn:hover { background: #4a2830; }

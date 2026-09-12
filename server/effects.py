@@ -1,6 +1,8 @@
+import hashlib
 import json
 import os
 import re
+import threading
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -81,8 +83,70 @@ def load_manifest() -> dict:
     return raw
 
 
-MANIFEST = load_manifest()
+MANIFEST: dict = {}
+EFFECTS: dict[str, dict] = {}
+MANIFEST_REV: str = ""
+_MANIFEST_LOCK = threading.RLock()
 
-EFFECTS: dict[str, dict] = {
-    effect_id: _sanitize_effect(effect_id, spec) for effect_id, spec in MANIFEST["effects"].items()
-}
+
+def _file_hash(path: Path) -> str | None:
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
+def _catalog_fingerprint(raw: dict, manifest_hash: str | None) -> str:
+    effects = raw.get("effects") or {}
+    parts: list[str] = [str(raw.get("version", "")), manifest_hash or "missing", json.dumps(effects, sort_keys=True, ensure_ascii=False)]
+    for effect_id in sorted(effects):
+        spec = effects[effect_id] or {}
+        viewer = spec.get("viewer", "viewer.js")
+        parts.append(str(effect_id))
+        parts.append(str(viewer))
+        parts.append(_file_hash(EFFECTS_DIR / effect_id / viewer) or "missing")
+        console = spec.get("console", "console.js")
+        if isinstance(console, str) and console:
+            parts.append(str(console))
+            console_path = EFFECTS_DIR / effect_id / console
+            if console_path.is_file():
+                parts.append(_file_hash(console_path) or "unreadable")
+    return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
+
+
+def _load_catalog() -> tuple[dict, str]:
+    manifest_hash = _file_hash(MANIFEST_PATH)
+    raw = load_manifest()
+    rev = _catalog_fingerprint(raw, manifest_hash)
+    return raw, rev
+
+
+def _apply_catalog(raw: dict, rev: str) -> None:
+    global MANIFEST_REV
+    next_effects = {
+        effect_id: _sanitize_effect(effect_id, spec)
+        for effect_id, spec in (raw.get("effects") or {}).items()
+    }
+    MANIFEST.clear()
+    MANIFEST.update(raw)
+    EFFECTS.clear()
+    EFFECTS.update(next_effects)
+    MANIFEST_REV = rev
+
+
+def _initialize_catalog() -> None:
+    with _MANIFEST_LOCK:
+        raw, rev = _load_catalog()
+        _apply_catalog(raw, rev)
+
+
+def reload_effects() -> tuple[dict, str, bool]:
+    with _MANIFEST_LOCK:
+        raw, rev = _load_catalog()
+        if rev == MANIFEST_REV:
+            return dict(EFFECTS), MANIFEST_REV, False
+        _apply_catalog(raw, rev)
+        return dict(EFFECTS), MANIFEST_REV, True
+
+
+_initialize_catalog()

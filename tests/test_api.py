@@ -1,3 +1,4 @@
+import copy
 import json
 import os
 import socket
@@ -12,6 +13,7 @@ from fastapi.testclient import TestClient
 
 os.environ["RTX_EFFECTS_MANIFEST"] = str(Path(__file__).resolve().parent / "fixtures" / "effects.json")
 
+import server.effects
 import server.main as m
 import server.relay as relay
 
@@ -28,6 +30,7 @@ def _free_port() -> int:
 def client(monkeypatch):
     monkeypatch.setattr(m, "ACCESS_KEY", "")
     m.rate_limiter.reset()
+    m.reload_limiter.reset()
     with TestClient(m.app) as tc:
         yield tc
 
@@ -35,6 +38,7 @@ def client(monkeypatch):
 @pytest.fixture()
 def live_server():
     m.rate_limiter.reset()
+    m.reload_limiter.reset()
     port = _free_port()
     config = uvicorn.Config("server.main:app", host="127.0.0.1", port=port, log_level="warning")
     server = uvicorn.Server(config)
@@ -55,6 +59,53 @@ def live_server():
     yield f"http://127.0.0.1:{port}"
     server.should_exit = True
     t.join(timeout=5)
+
+
+@pytest.fixture()
+def reload_catalog(tmp_path, monkeypatch):
+    fixture_manifest = Path(__file__).resolve().parent / "fixtures" / "effects.json"
+    initial_raw = json.loads(fixture_manifest.read_text(encoding="utf-8"))
+
+    initial_path = tmp_path / "initial.json"
+    initial_path.write_text(json.dumps(initial_raw), encoding="utf-8")
+
+    reloaded_raw = copy.deepcopy(initial_raw)
+    reloaded_raw["effects"]["particle"]["label"] = "Reloaded Particle"
+    reloaded_raw["effects"]["particle"]["params"]["count"]["default"] = 55
+    reloaded_path = tmp_path / "reloaded.json"
+    reloaded_path.write_text(json.dumps(reloaded_raw), encoding="utf-8")
+
+    invalid_path = tmp_path / "invalid.json"
+    invalid_path.write_text("{", encoding="utf-8")
+
+    missing_raw = copy.deepcopy(initial_raw)
+    missing_raw["effects"]["missing"] = {
+        "label": "Missing",
+        "viewer": "viewer.js",
+        "params": {},
+    }
+    missing_path = tmp_path / "missing.json"
+    missing_path.write_text(json.dumps(missing_raw), encoding="utf-8")
+
+    monkeypatch.setattr(server.effects, "MANIFEST_PATH", initial_path)
+    old_manifest = copy.deepcopy(server.effects.MANIFEST)
+    old_effects = copy.deepcopy(server.effects.EFFECTS)
+    old_rev = server.effects.MANIFEST_REV
+    server.effects.reload_effects()
+
+    yield {
+        "initial": initial_path,
+        "reloaded": reloaded_path,
+        "invalid": invalid_path,
+        "missing": missing_path,
+        "use": lambda path: monkeypatch.setattr(server.effects, "MANIFEST_PATH", Path(path)),
+    }
+
+    server.effects.MANIFEST.clear()
+    server.effects.MANIFEST.update(old_manifest)
+    server.effects.EFFECTS.clear()
+    server.effects.EFFECTS.update(old_effects)
+    server.effects.MANIFEST_REV = old_rev
 
 
 def test_health(client):
@@ -88,6 +139,85 @@ def test_effects_list_sanitized_metadata(client):
     assert firework["params"]["colors"]["editable"] is False
     assert "name" not in particle
     assert "viewer" not in particle
+
+
+def test_effects_list_includes_rev(client):
+    r = client.get("/api/effects")
+    assert r.status_code == 200
+    body = r.json()
+    assert isinstance(body["rev"], str)
+    assert body["rev"]
+
+
+def test_reload_success_updates_rev_and_catalog(client, reload_catalog):
+    before = client.get("/api/effects").json()
+    reload_catalog["use"](reload_catalog["reloaded"])
+    r = client.post("/api/effects/reload")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+    assert body["changed"] is True
+    assert body["rev"] != before["rev"]
+    effects = client.get("/api/effects").json()["effects"]
+    assert effects["particle"]["label"] == "Reloaded Particle"
+    assert effects["particle"]["params"]["count"]["default"] == 55
+    assert set(body["effects"]) == set(effects.keys())
+
+
+def test_reload_no_change_returns_same_rev(client, reload_catalog):
+    first = client.post("/api/effects/reload").json()
+    m.reload_limiter.reset()
+    second = client.post("/api/effects/reload").json()
+    assert first["changed"] is False
+    assert second["changed"] is False
+    assert first["rev"] == second["rev"]
+
+
+def test_reload_invalid_manifest_preserves_old_catalog(client, reload_catalog):
+    before = client.get("/api/effects").json()
+    reload_catalog["use"](reload_catalog["invalid"])
+    r = client.post("/api/effects/reload")
+    assert r.status_code == 400
+    after = client.get("/api/effects").json()
+    assert after["rev"] == before["rev"]
+    assert after["effects"]["particle"]["label"] != "Reloaded Particle"
+
+
+def test_reload_missing_viewer_file_preserves_old_catalog(client, reload_catalog):
+    before = client.get("/api/effects").json()
+    reload_catalog["use"](reload_catalog["missing"])
+    r = client.post("/api/effects/reload")
+    assert r.status_code == 400
+    after = client.get("/api/effects").json()
+    assert after["rev"] == before["rev"]
+    assert "missing" not in after["effects"]
+
+
+def test_reload_requires_access_key(client, reload_catalog, monkeypatch):
+    monkeypatch.setattr(m, "ACCESS_KEY", "secret")
+    m.reload_limiter.reset()
+    assert client.post("/api/effects/reload").status_code == 401
+    m.reload_limiter.reset()
+    assert client.post("/api/effects/reload", headers={"X-Access-Key": "secret"}).status_code == 200
+    m.reload_limiter.reset()
+    assert client.post("/api/effects/reload", params={"key": "secret"}).status_code == 401
+    m.reload_limiter.reset()
+    assert (
+        client.post(
+            "/api/effects/reload",
+            headers={"X-Access-Key": "secret"},
+            params={"key": "wrong"},
+        ).status_code
+        == 200
+    )
+
+
+def test_reload_rate_limit(client, reload_catalog):
+    m.reload_limiter.reset()
+    assert client.post("/api/effects/reload").status_code == 200
+    r = client.post("/api/effects/reload")
+    assert r.status_code == 429
+    assert r.headers["retry-after"] == "1"
 
 
 def test_serves_effects_manifest_json(client):
@@ -348,8 +478,11 @@ def test_access_key_enforced(client, monkeypatch):
         headers={"X-Access-Key": "secret"},
     )
     assert ok.status_code == 200
-    ok2 = client.post("/api/effect", json={"effect": "ripple", "x": 1, "y": 1}, params={"key": "secret"})
-    assert ok2.status_code == 200
+    assert (
+        client.post("/api/effect", json={"effect": "ripple", "x": 1, "y": 1}, params={"key": "secret"}).status_code
+        == 401
+    )
+    assert client.post("/api/clear", params={"key": "secret"}).status_code == 401
 
 
 def test_sse_receives_effect_and_clear(live_server):
@@ -411,6 +544,37 @@ def test_sse_access_key(live_server, monkeypatch):
         assert r.status_code == 200
         first = next(r.iter_lines())
     assert first.startswith("retry:")
+
+
+def test_sse_manifest_broadcast_on_reload(live_server, reload_catalog):
+    base = live_server
+    m.reload_limiter.reset()
+    events = []
+
+    def reader():
+        with httpx.stream("GET", f"{base}/api/stream", timeout=httpx.Timeout(30, connect=5)) as r:
+            assert r.status_code == 200
+            event_type = None
+            for line in r.iter_lines():
+                if line.startswith("event: "):
+                    event_type = line[7:].strip()
+                elif line.startswith("data: ") and event_type:
+                    data = json.loads(line[6:])
+                    if event_type == "manifest":
+                        events.append(data)
+                        break
+
+    t = threading.Thread(target=reader, daemon=True)
+    t.start()
+    time.sleep(1.0)
+    reload_catalog["use"](reload_catalog["reloaded"])
+    r = httpx.post(f"{base}/api/effects/reload", timeout=5)
+    assert r.status_code == 200
+    t.join(timeout=15)
+    assert not t.is_alive(), "SSE manifest reader did not finish in time"
+    assert events
+    assert events[0]["rev"] == r.json()["rev"]
+    assert events[0]["effects"]["particle"]["label"] == "Reloaded Particle"
 
 
 def test_examples_disabled_by_default(client, monkeypatch):

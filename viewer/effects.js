@@ -29,6 +29,13 @@
     registry[type] = factory;
   }
 
+  function reset() {
+    Object.keys(registry).forEach(function (key) {
+      delete registry[key];
+    });
+    return registry;
+  }
+
   function stepEffect(effect, targetElapsed, maxStep) {
     maxStep = maxStep || 50;
     if (effect.elapsed == null) effect.elapsed = 0;
@@ -50,6 +57,7 @@
   return {
     registry: registry,
     register: register,
+    reset: reset,
     createEffect: createEffect,
     stepEffect: stepEffect,
     toPixels: toPixels,

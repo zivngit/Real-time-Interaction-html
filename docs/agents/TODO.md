@@ -12,7 +12,7 @@
 
 - SSE 斷線期間特效遺失（規格：不重播）
 - 限頻為全域滑動視窗（未區分客戶端）
-- 前端（console/viewer）已有 Playwright 瀏覽器 E2E（`e2e/`，9 項）；console 另有 node vm 冒煙測試（`tests/test_console.mjs`），viewer 另有 node vm 冒煙測試（`tests/test_effects.mjs`），特效範例另有 node vm 冒煙測試（`tests/test_effect_examples.mjs`）
+- 前端（console/viewer）已有 Playwright 瀏覽器 E2E（`tests/e2e/`，10 項）；console 另有 node vm 冒煙測試（`tests/test_console.mjs`，52 項），viewer 另有 node vm 冒煙測試（`tests/test_effects.mjs`，18 項），特效範例另有 node vm 冒煙測試（`tests/test_effect_examples.mjs`，16 項）
 
 ## 第一階段：建立可維護的執行基礎
 
@@ -50,6 +50,10 @@
 - [x] README：改以專案特色、系統架構、目錄結構、嵌入方式與測試說明為主，減少 AI 協作流程說明；`.gitignore` 補上 `.pytest_cache/`（2026-09-11）
 - [x] 測試結構整理：`e2e/` 移至 `tests/e2e/`、`conftest.py` 移至 `tests/conftest.py` 並補 `sys.path`；`playwright.config.js` 改為 `testDir: "./tests/e2e"`；`package.json test:unit` 加 Python dependency preflight（2026-09-11）
 - [x] server 重構：`server/main.py` 只保留 app／middleware／API 與資源路由；`config`、`security`、`params`、`relay`、`static_files` 拆離為獨立模組；`normalize_params` 接受 effects catalog；`tests/test_api.py` 改 patch `main.broadcast` 與 `relay._subscribers`（2026-09-11）
+- [x] effects manifest 手動重載：`POST /api/effects/reload` 以 `X-Access-Key`／`?key=` 驗證、獨立 1/s 限頻、thread-safe 重讀 manifest 並依 manifest＋`viewer.js`／`console.js` fingerprint `rev` 更新 catalog；驗證失敗保留舊 catalog 並回 `400`；`GET /api/effects` 回傳 `rev`；viewer 於 SSE `open`／`manifest` 依 `rev` 自動重載插件且不清除 active effects；console 新增 `#rtx-reload-btn` 手動重載（重新整理亦可）；tests/test_api.py 41 項、node 86 項、Playwright E2E 10 項（2026-09-12）
+- [x] effects manifest 多 Console E2E：新增 `tests/e2e/multi-console-reload.spec.js`，以兩個獨立 uvicorn server、不同 port／manifest／`ACCESS_KEY`，驗證不同 server URL / key 的多 Console 端各自手動重載、被移除 effect 的 selected fallback 且互不影響；Playwright E2E 更新為 11 項（2026-09-12）
+- [x] 重新核對 effects manifest reload 實作與 SPEC 第 13 節修正記錄：功能行為一致；更新 `A-10` cache header、`Q-01` temp manifest 覆蓋範圍、`MC-01` selected fallback 的完成狀態措辭（2026-09-12）
+- [x] POST 存取金鑰改為 header-only：`POST /api/effects/reload`、`POST /api/effect`、`POST /api/clear` 移除 `?key=` query fallback，僅接受 `X-Access-Key` header；SSE `GET /api/stream` 維持 `?key=`（2026-09-12）
 - [ ] 處理 pytest 的 2 個第三方 deprecation warnings：評估加入 `httpx2` 並限制 `anyio>=4.10,<4.15`（已用 temp dependencies 驗證可消除 warnings；2026-09-11 暫不處理）
 - [ ] server 斷線重播暫存（最近 N 則）
 - [ ] viewer 狀態回報（POST /api/status）

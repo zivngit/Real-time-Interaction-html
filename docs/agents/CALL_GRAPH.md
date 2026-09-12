@@ -1,6 +1,6 @@
 # Real-time Interaction html 函式呼叫關係圖
 
-> 最後更新：2026-09-11
+> 最後更新：2026-09-12
 
 ## 1. 整體架構
 
@@ -11,13 +11,13 @@ flowchart LR
     V["examples/embed-viewer.html（＋embed-both.html）<br/>viewer/app.js（Effects 未載入時動態載入 viewer/effects.js<br/>載入 /api/effects 後動態載入各 /effects/{id}/viewer.js）"]
     E["examples/index.html<br/>（demo／showcase 索引，opt-in：SERVE_EXAMPLES=1）"]
     LS[("localStorage<br/>rtx.srvUrl / rtx.srvKey")]
-    C -->|"POST /api/effect、POST /api/clear"| S
+    C -->|"POST /api/effect、POST /api/clear、POST /api/effects/reload"| S
     C -->|"GET /api/effects"| S
     C -->|"GET /console/style.css、/console/icons.js、/console/app.js (no-store)"| S
     C -->|"GET /effects/{id}/console.js (no-store，選用)"| S
-    S -->|"GET /api/stream<br/>(SSE: effect / clear / ping)"| V
+    S -->|"GET /api/stream<br/>(SSE: effect / clear / ping / manifest)"| V
     V -->|"GET /viewer/app.js、/viewer/effects.js (no-store)"| S
-    V -->|"GET /effects/effects.json、/effects/{id}/viewer.js (no-store)"| S
+    V -->|"GET /api/effects、/effects/{id}/viewer.js (no-store)"| S
     S -->|"GET /examples/*（no-store，opt-in）"| E
     E -->|"連結 embed-*.html"| C
     E -->|"連結 embed-*.html"| V
@@ -34,6 +34,7 @@ flowchart TD
         direction LR
         PE["POST /api/effect"]
         PC["POST /api/clear"]
+        PR["POST /api/effects/reload"]
         ST["GET /api/stream"]
         H["GET /health"]
         LE["GET /api/effects"]
@@ -43,10 +44,12 @@ flowchart TD
     end
 
     subgraph guard["驗證"]
-        CK["check_key（server/security.py；X-Access-Key / ?key）"]
+        CK["check_key（server/security.py；POST 用 X-Access-Key、SSE 用 ?key=）"]
         VE{"effect 在 EFFECTS 中？"}
         NP["normalize_params（server/params.py；schema 驗證，無效值回退預設）"]
         RL["RateLimiter.check（server/relay.py；滑動視窗 20/s）"]
+        RRL["reload_limiter.check（server/relay.py；滑動視窗 1/s）"]
+        RE{"catalog fingerprint 變更？"}
         EN{"examples_enabled（server/static_files.py）：SERVE_EXAMPLES 啟用？"}
         EP{"effect_asset（server/static_files.py）：effect_id 合法＋檔案存在？"}
     end
@@ -56,14 +59,14 @@ flowchart TD
         SUB["add_subscriber（server/relay.py）：_subscribers.add(queue)"]
         GEN["event_stream（server/relay.py）：retry: 3000 → queue.get(timeout=15s)"]
         PING["yield event: ping（心跳）"]
-        MSG["yield event: effect / clear"]
+        MSG["yield event: effect / clear / manifest"]
         DIS["remove_subscriber（server/relay.py）：_subscribers.discard(queue)（finally）"]
     end
 
     subgraph err["錯誤回應"]
         direction LR
         E401["HTTP 401 invalid access key"]
-        E400["HTTP 400 unknown effect"]
+        E400["HTTP 400 unknown effect／manifest 驗證失敗"]
         E429["HTTP 429 rate limit exceeded（Retry-After: 1）"]
         E404["HTTP 404 examples 停用／effects 資產不存在"]
     end
@@ -71,22 +74,29 @@ flowchart TD
     subgraph plain["簡單回應"]
         direction LR
         OK["200 {ok, ts}"]
-        LOK["200 EFFECTS 目錄"]
+        LOK["200 {rev, effects}"]
+        RLOK["200 {ok, changed, rev, effects}"]
         FR["FileResponse（server/static_files.py；no-store）"]
     end
 
     PE --> CK
     PC --> CK
+    PR --> CK
     ST --> CK
     CK -- "金鑰不符" --> E401
     CK -- "effect 請求" --> VE
     CK -- "clear 請求" --> RL
+    CK -- "reload 請求" --> RRL
     CK -- "stream 請求" --> SUB
     VE -- "否" --> E400
     VE -- "是" --> NP
     NP --> RL
     RL -- "超限" --> E429
     RL --> BC
+    RRL -- "超限" --> E429
+    RRL --> RE
+    RE -- "否" --> RLOK
+    RE -- "是（reload_effects → _apply_catalog → broadcast manifest）" --> RLOK
     SUB --> GEN
     GEN -- "15s 逾時" --> PING
     GEN -- "收到訊息" --> MSG
@@ -114,6 +124,12 @@ sequenceDiagram
 
     Note over C: examples/embed-console.html（＋embed-both.html）載入 /console/style.css＋/console/icons.js＋/console/app.js\n初始化 → loadEffects() fetch /api/effects\n成功 → loadConsolePlugins()（依 consoleUrl 動態載入 /effects/{id}/console.js，失敗僅 log 回退）→ renderEffects() 動態建立特效按鈕（icon 優先序：插件 iconSVG → 插件 iconID → manifest icon → RTX_EFFECT_ICONS[type] → generic → fallback；未知特效 generic）\n失敗/空表 → fallback 內建特效\nrenderParams()：已註冊 console 插件優先 plugin.render()，否則依 schema 渲染（editable:false 與 array 不顯示）\nparamsBtn / connBtn → bindToggle()（展開時 applyFabPos()）\napplyFabPos() → panelCandidates() 選最小重疊位置；FAB z-index 高於 panel
     Note over V: examples/embed-viewer.html（＋embed-both.html）載入 /viewer/app.js\n/viewer/app.js 若 Effects 未載入會動態載入 /viewer/effects.js\nfetch /api/effects → 並行動態載入各 /effects/{id}/viewer.js（單一失敗僅 log 並跳過該特效）
+    Note over C: 手動重載：點擊 #rtx-reload-btn → POST /api/effects/reload → GET /api/effects → applyManifest(rev, resetRegistry=true)
+    C->>S: POST /api/effects/reload
+    S->>S: check_key → reload_limiter.check(1) → reload_effects（fingerprint 未變則 changed=false；驗證失敗回 400 並保留舊 catalog）
+    S-->>V: SSE event: manifest（changed=true 時，含 rev/effects）
+    V->>V: loadViewerPlugins：Effects.reset → 依 rev cache-busting 載入 viewer.js；不清除 active effects
+    C->>C: reloadEffectsTable：GET /api/effects → loadConsolePlugins → renderEffects
     C->>C: 選特效 → selectEffect() → renderParams()
     C->>C: 點擊 → paramsFor() 讀取 rtx-p-* 輸入
     C->>S: POST /api/effect {effect, x, y, params}
@@ -150,6 +166,7 @@ classDiagram
     class Effects {
         +registry
         +register(type, factory)
+        +reset()
         +createEffect(type, px, py, params)
         +stepEffect(effect, targetElapsed, maxStep)
         +toPixels(x, y, w, h)
@@ -180,11 +197,15 @@ classDiagram
         +spawn()
         +clearAll()
         +handleEffect(msg)
+        +loadViewerPlugins(effects, rev)
     }
     class EffectCatalog {
         <<server/effects.py>>
         +MANIFEST
         +EFFECTS
+        +MANIFEST_REV
+        +load_manifest()
+        +reload_effects()
     }
     class ServerConfig {
         <<server/config.py>>
@@ -220,6 +241,8 @@ classDiagram
     }
     class Server {
         <<server/main.py>>
+        +list_effects()
+        +reload_manifest()
         +post_effect()
         +post_clear()
         +stream()
@@ -243,6 +266,9 @@ classDiagram
         +renderEffects(meta)
         +normalizeEffects(data)
         +loadEffects()
+        +loadConsolePlugins(meta, rev)
+        +applyManifest(meta, rev, resetRegistry)
+        +reloadEffectsTable()
         +bindToggle(btn, box)
         +headers()
         +paramsFor()
@@ -252,17 +278,17 @@ classDiagram
     EffectPlugin ..> Effects : register(type, factory)
     Effects ..> Effect : 建立（particle / firework / ripple / text）
     Console ..> ConsolePlugin : 選用 render／iconID／iconSVG（缺失時 schema 渲染／manifest icon）
-    Console ..> Server : POST /api/effect / POST /api/clear
-    Server ..> EffectCatalog : 讀取 EFFECTS / MANIFEST_PATH
+    Console ..> Server : POST /api/effect / POST /api/clear / POST /api/effects/reload
+    Server ..> EffectCatalog : 讀取 EFFECTS / MANIFEST / MANIFEST_REV / MANIFEST_PATH；reload_effects()
     Server ..> ServerConfig : ACCESS_KEY / RATE_LIMIT_PER_SEC
     Server ..> Security : check_key()
     Server ..> Params : normalize_params()
     Server ..> Relay : add_subscriber / broadcast / event_stream
-    Server ..> RateLimiter : rate_limiter.check()
+    Server ..> RateLimiter : rate_limiter.check() / reload_limiter.check(1)
     Server ..> StaticFiles : file_response / effect_asset / examples_response
     Params ..> EffectCatalog : effects 參數缺省時讀取 EFFECTS
     EffectCatalog ..> EffectPlugin : manifest 宣告 /effects/<id>/viewer.js
-    Server ..> Viewer : SSE effect / clear / ping
+    Server ..> Viewer : SSE effect / clear / ping / manifest
 ```
 
 ## 6. 測試關係
@@ -270,12 +296,12 @@ classDiagram
 ```mermaid
 flowchart LR
     TF["tests/fixtures/effects.json<br/>測試 manifest（固定原四特效）"]
-    TA["tests/test_api.py<br/>pytest＋TestClient（33）<br/>RTX_EFFECTS_MANIFEST → tests/fixtures/effects.json"] --> M["server/main.py<br/>＋server/config.py、security.py、params.py、relay.py、static_files.py、effects.py"]
+    TA["tests/test_api.py<br/>pytest＋TestClient（41）<br/>fixture manifest 與 temp reload manifest"] --> M["server/main.py<br/>＋server/config.py、security.py、params.py、relay.py、static_files.py、effects.py"]
     TA --> TF
-    TE["tests/test_effects.mjs<br/>node --test＋vm（17）"] --> S["viewer/effects.js ＋ effects/*/viewer.js"]
-    TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（51）"] --> K["console/app.js ＋ effects/*/console.js"]
+    TE["tests/test_effects.mjs<br/>node --test＋vm（18）"] --> S["viewer/effects.js ＋ effects/*/viewer.js"]
+    TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（52）"] --> K["console/app.js ＋ effects/*/console.js"]
     TX["tests/test_effect_examples.mjs<br/>node --test＋vm fake sandbox（16）"] --> X["examples/effects/*/effects.json ＋ viewer.js ＋ console.js"]
-    TP["tests/e2e/*.spec.js<br/>Playwright E2E（9）<br/>自動啟動 uvicorn port 8123<br/>RTX_EFFECTS_MANIFEST → tests/fixtures/effects.json"] --> M
+    TP["tests/e2e/*.spec.js<br/>Playwright E2E（11）<br/>預設 webServer port 8123<br/>reload-manifest.spec.js 另啟獨立 server＋temp manifest<br/>multi-console-reload.spec.js 另啟兩個獨立 server／key＋selected fallback"] --> M
     TP --> K
     TP --> S
     TP --> TF

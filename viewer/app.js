@@ -12,6 +12,7 @@
   }
   var base = String(cfg.url || origin || "http://localhost:8000").replace(/\/+$/, "");
   var key = cfg.key || (script ? script.getAttribute("data-key") : "") || "";
+  var currentRev = "";
 
   function loadScript(src) {
     return new Promise(function (resolve) {
@@ -25,6 +26,31 @@
       };
       document.head.appendChild(s);
     });
+  }
+
+  async function loadViewerPlugins(effects, rev) {
+    if (typeof Effects !== "undefined" && typeof Effects.reset === "function") {
+      Effects.reset();
+    }
+    var urls = Object.keys(effects)
+      .map(function (id) {
+        return effects[id] && effects[id].viewerUrl;
+      })
+      .filter(Boolean);
+    if (urls.length) {
+      var suffix = rev ? "?v=" + encodeURIComponent(rev) : "";
+      var results = await Promise.all(
+        urls.map(function (u) {
+          return loadScript(base + u + suffix);
+        })
+      );
+      urls.forEach(function (u, i) {
+        if (!results[i]) console.warn("[effects] 特效插件載入失敗，略過", u);
+      });
+    }
+    if (rev) {
+      currentRev = rev;
+    }
   }
 
   function boot() {
@@ -107,12 +133,34 @@
     var connected = false;
     var pingWarned = false;
 
-    es.addEventListener("open", function () {
+    es.addEventListener("open", async function () {
       if (!connected) {
         connected = true;
         pingWarned = false;
         console.info("[effects] 已連線", base);
       }
+      try {
+        var r = await fetch(base + "/api/effects");
+        if (!r.ok) return;
+        var data = await r.json();
+        if (data && data.rev && data.rev !== currentRev) {
+          await loadViewerPlugins(data.effects || {}, data.rev);
+        }
+      } catch (err) {
+        console.warn("[effects] 重新同步 manifest 失敗", err);
+      }
+    });
+    es.addEventListener("manifest", function (ev) {
+      var data;
+      try {
+        data = JSON.parse(ev.data);
+      } catch (err) {
+        return;
+      }
+      if (!data || !data.rev || data.rev === currentRev) return;
+      loadViewerPlugins(data.effects || {}, data.rev).catch(function (err) {
+        console.warn("[effects] manifest 插件更新失敗", err);
+      });
     });
     es.addEventListener("effect", function (ev) {
       handleEffect(JSON.parse(ev.data));
@@ -151,30 +199,18 @@
     }
 
     var effects = {};
+    var rev = "";
     try {
       var r = await fetch(base + "/api/effects");
       if (!r.ok) throw new Error("status " + r.status);
       var manifest = await r.json();
       effects = (manifest && manifest.effects) || {};
+      rev = (manifest && manifest.rev) || "";
     } catch (err) {
       console.error("[effects] /api/effects 載入失敗", err);
     }
 
-    var urls = Object.keys(effects)
-      .map(function (id) {
-        return effects[id] && effects[id].viewerUrl;
-      })
-      .filter(Boolean);
-    if (urls.length) {
-      var results = await Promise.all(
-        urls.map(function (u) {
-          return loadScript(base + u);
-        })
-      );
-      urls.forEach(function (u, i) {
-        if (!results[i]) console.warn("[effects] 特效插件載入失敗，略過", u);
-      });
-    }
+    await loadViewerPlugins(effects, rev);
 
     boot();
   }

@@ -8,7 +8,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from server.config import ACCESS_KEY, RATE_LIMIT_PER_SEC
-from server.effects import EFFECTS, MANIFEST_PATH
+import server.effects as effects
+from server.effects import EFFECTS, ManifestError, reload_effects
 from server.params import normalize_params
 from server.relay import RateLimiter, add_subscriber, broadcast, event_stream
 from server.security import check_key
@@ -32,6 +33,7 @@ app.add_middleware(
 )
 
 rate_limiter = RateLimiter()
+reload_limiter = RateLimiter()
 
 
 class EffectRequest(BaseModel):
@@ -48,16 +50,36 @@ async def health() -> dict:
 
 @app.get("/api/effects")
 async def list_effects() -> dict:
-    return {"effects": EFFECTS}
+    return {"rev": effects.MANIFEST_REV, "effects": EFFECTS}
+
+
+@app.post("/api/effects/reload")
+async def reload_manifest(x_access_key: str | None = Header(default=None)) -> dict:
+    check_key(ACCESS_KEY, x_access_key, None)
+    await reload_limiter.check(1)
+    try:
+        new_effects, rev, changed = await asyncio.to_thread(reload_effects)
+    except ManifestError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if changed:
+        broadcast(
+            {
+                "id": str(uuid.uuid4()),
+                "type": "manifest",
+                "rev": rev,
+                "effects": new_effects,
+                "ts": int(time.time()),
+            }
+        )
+    return {"ok": True, "changed": changed, "rev": rev, "effects": list(new_effects.keys())}
 
 
 @app.post("/api/effect")
 async def post_effect(
     body: EffectRequest,
     x_access_key: str | None = Header(default=None),
-    key: str | None = Query(default=None),
 ) -> dict:
-    check_key(ACCESS_KEY, x_access_key, key)
+    check_key(ACCESS_KEY, x_access_key, None)
     if body.effect not in EFFECTS:
         raise HTTPException(status_code=400, detail=f"unknown effect: {body.effect}")
     await rate_limiter.check(RATE_LIMIT_PER_SEC)
@@ -75,11 +97,8 @@ async def post_effect(
 
 
 @app.post("/api/clear")
-async def post_clear(
-    x_access_key: str | None = Header(default=None),
-    key: str | None = Query(default=None),
-) -> dict:
-    check_key(ACCESS_KEY, x_access_key, key)
+async def post_clear(x_access_key: str | None = Header(default=None)) -> dict:
+    check_key(ACCESS_KEY, x_access_key, None)
     await rate_limiter.check(RATE_LIMIT_PER_SEC)
     msg = {"id": str(uuid.uuid4()), "type": "clear", "ts": int(time.time())}
     broadcast(msg)
@@ -131,7 +150,7 @@ async def console_style_css():
 
 @app.get("/effects/effects.json")
 async def effects_manifest():
-    return file_response(MANIFEST_PATH, "application/json", "effects/effects.json not found")
+    return file_response(effects.MANIFEST_PATH, "application/json", "effects/effects.json not found")
 
 
 @app.get("/effects/{effect_id}/viewer.js")

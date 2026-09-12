@@ -72,6 +72,12 @@
   connBtn.innerHTML = uiIcon("conn");
   row.appendChild(connBtn);
 
+  var reloadBtn = make("button", "rtx-reload-btn", "rtx-action");
+  reloadBtn.title = "重載特效表";
+  reloadBtn.setAttribute("aria-label", "重載特效表");
+  reloadBtn.textContent = "重載";
+  row.appendChild(reloadBtn);
+
   var clearBtn = make("button", "rtx-clear-btn");
   clearBtn.title = "清屏";
   clearBtn.setAttribute("aria-label", "清屏");
@@ -284,6 +290,7 @@
   var EFFECTS_META = FALLBACK_EFFECTS;
   var fxButtonEls = [];
   var selected = Object.keys(EFFECTS_META)[0];
+  var currentRev = "";
 
   function isSchema(params) {
     if (!params || typeof params !== "object" || Array.isArray(params)) return false;
@@ -488,18 +495,33 @@
     });
   }
 
-  function loadConsolePlugins(meta) {
+  function loadConsolePlugins(meta, rev) {
     var jobs = [];
     Object.keys(meta).forEach(function (type) {
       var url = meta[type] && meta[type].consoleUrl;
       if (!url) return;
+      var suffix = rev ? "?v=" + encodeURIComponent(rev) : "";
       jobs.push(
-        loadScriptTag(srvUrl + url).then(function (ok) {
-          if (!ok) console.warn("[control] console 插件載入失敗，使用 schema 渲染", srvUrl + url);
+        loadScriptTag(srvUrl + url + suffix).then(function (ok) {
+          if (!ok) console.warn("[control] console 插件載入失敗，使用 schema 渲染", srvUrl + url + suffix);
         })
       );
     });
     return Promise.all(jobs);
+  }
+
+  async function applyManifest(meta, rev, resetRegistry) {
+    if (rev && rev === currentRev) return;
+    if (resetRegistry) {
+      Object.keys(consoleRegistry.registry).forEach(function (key) {
+        delete consoleRegistry.registry[key];
+      });
+    }
+    await loadConsolePlugins(meta, rev);
+    renderEffects(meta);
+    if (rev) {
+      currentRev = rev;
+    }
   }
 
   async function loadEffects() {
@@ -509,11 +531,46 @@
       var data = await r.json();
       var meta = normalizeEffects(data);
       if (meta) {
-        await loadConsolePlugins(meta);
-        renderEffects(meta);
+        await applyManifest(meta, (data && data.rev) || "", false);
       }
     } catch (err) {
       console.warn("[control] 特效表載入失敗，使用內建清單", err);
+    }
+  }
+
+  async function reloadEffectsTable() {
+    if (reloadBtn.disabled) return;
+    reloadBtn.disabled = true;
+    try {
+      var r = await fetch(srvUrl + "/api/effects/reload", {
+        method: "POST",
+        headers: headers(),
+        body: "{}",
+      });
+      if (r.status === 401) {
+        console.error("[control] 401 金鑰錯誤");
+        return;
+      }
+      if (!r.ok) {
+        console.error("[control] 重載特效表失敗", r.status, await r.text());
+        return;
+      }
+      var resp = await r.json();
+      var metaResp = await fetch(srvUrl + "/api/effects");
+      if (!metaResp.ok) {
+        console.error("[control] 重載後特效表讀取失敗", metaResp.status);
+        return;
+      }
+      var data = await metaResp.json();
+      var meta = normalizeEffects(data);
+      if (meta) {
+        await applyManifest(meta, (data && data.rev) || "", true);
+      }
+      console.info("[control] 特效表已重載", resp);
+    } catch (err) {
+      console.error("[control] 重載特效表失敗", err);
+    } finally {
+      reloadBtn.disabled = false;
     }
   }
 
@@ -581,6 +638,8 @@
   clearBtn.addEventListener("click", function () {
     post("/api/clear", {});
   });
+
+  reloadBtn.addEventListener("click", reloadEffectsTable);
 
   window.addEventListener("click", function (e) {
     if (e.target.closest("#rtx-panel") || e.target.closest("#rtx-fab")) return;

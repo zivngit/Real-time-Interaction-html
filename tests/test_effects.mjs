@@ -160,3 +160,15 @@ test("text plugin draw uses merged params", () => {
   e.draw(ctx);
   assert.equal(ctx.font, "600 24px system-ui, sans-serif");
 });
+
+test("Effects.reset clears registry but keeps registry identity", () => {
+  const registryBefore = Effects.registry;
+  Effects.register("reset-test", () => ({ update() {}, draw() {}, done() { return true; } }));
+  assert.equal(typeof Effects.registry["reset-test"], "function");
+  Effects.reset();
+  assert.equal(Effects.registry["reset-test"], undefined);
+  assert.equal(Effects.registry, registryBefore);
+  for (const id of ["particle", "ripple", "firework", "text"]) {
+    runPlugin(join("effects", id, "viewer.js"));
+  }
+});

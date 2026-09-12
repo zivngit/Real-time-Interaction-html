@@ -7,10 +7,11 @@
 - **可嵌入 viewer**：只要一行 `<script>` 即可在任意網頁加上即時特效顯示層，canvas 不擋宿主網頁操作。
 - **可嵌入 console**：以浮動按鈕＋面板控制特效，支援選特效、調參數、清屏、拖曳移動位置。
 - **manifest 驅動特效**：特效清單集中在 `effects/effects.json`；新增特效主要新增 manifest entry 與 `effects/<id>/viewer.js`，不需改 server／console 核心。
+- **manifest 手動重載**：`POST /api/effects/reload` 重新讀取 manifest 與插件 fingerprint；viewer 透過 SSE `manifest` 自動更新，console 以手動「重載」或頁面重新整理套用。
 - **params schema 驗證**：server 依 manifest 參數型別驗證，無效值回退預設值。
 - **多 viewer 廣播**：console 送出事件後，server 以 SSE 推送給所有已連線 viewer。
 - **相對座標**：使用 viewport 0–100 百分比座標，viewer 自行換算成 canvas 像素。
-- **可選存取金鑰**：server 可設定 `ACCESS_KEY`；未設定時全開放。
+- **可選存取金鑰**：server 可設定 `ACCESS_KEY`；未設定時全開放。POST API 使用 `X-Access-Key` header；SSE 使用 `?key=` query。
 - **全域限頻**：`POST /api/effect` 使用滑動視窗限制（20/s）。
 - **完整自動化測試**：pytest 測 server API、node 測 viewer／console 邏輯、Playwright 測真實瀏覽器 E2E。
 
@@ -24,8 +25,8 @@ flowchart LR
     M[("effects/effects.json<br/>特效 manifest")]
     P["effects/<id>/viewer.js<br/>effects/<id>/console.js"]
 
-    C -->|"POST /api/effect<br/>POST /api/clear"| S
-    S -->|"SSE /api/stream<br/>effect / clear / ping"| V
+    C -->|"POST /api/effect<br/>POST /api/clear<br/>POST /api/effects/reload"| S
+    S -->|"SSE /api/stream<br/>effect / clear / ping / manifest"| V
     M --> S
     S -->|"GET /api/effects"| C
     S -->|"GET /api/effects"| V
@@ -40,6 +41,7 @@ flowchart LR
 4. server 驗證 effect、params、金鑰與限頻後，廣播 SSE 事件。
 5. viewer 收到事件後，在 canvas 疊層上渲染特效。
 6. 使用者點清屏時，console 送出 `POST /api/clear`，viewer 清除目前特效。
+7. manifest 或特效插件變更後，以 `POST /api/effects/reload` 手動重載；viewer 收到 SSE `manifest` 後自動更新插件，console 需點［重載］或重新整理頁面。
 
 ## 目錄結構
 
@@ -47,7 +49,7 @@ flowchart LR
 project/
 ├── server/                  # FastAPI 中繼 server
 │   ├── main.py              # API、SSE、存取金鑰、限頻、examples
-│   ├── effects.py           # manifest 讀取與 params schema 驗證
+│   ├── effects.py           # manifest 讀取、schema 驗證、catalog `rev` 與手動重載
 │   ├── requirements.txt     # 執行依賴
 │   └── requirements-dev.txt # 測試依賴
 ├── effects/                 # 正式特效插件與 manifest
@@ -119,7 +121,7 @@ npm install
 <script src="http://<server-host>:8000/viewer/app.js"></script>
 ```
 
-viewer 會建立 canvas 疊層，並自動連線 server SSE。若 server 設定 `ACCESS_KEY`，需於 URL 加 `?key=<access-key>` 或依嵌入情境提供金鑰。
+viewer 會建立 canvas 疊層，並自動連線 server SSE。SSE `open` 與 `manifest` 事件會依 `rev` 重新載入特效插件；manifest 更新時不會清除目前進行中的特效。若 server 設定 `ACCESS_KEY`，需於 URL 加 `?key=<access-key>` 或依嵌入情境提供金鑰。
 
 ## 嵌入 console
 
@@ -139,6 +141,8 @@ window.CONTROL_CONFIG = {
   key: "<access-key>"
 };
 ```
+
+console 面板提供［重載］按鈕，手動呼叫 `POST /api/effects/reload` 後重新套用 manifest 與 console 插件。console 不透過 SSE 自動重載；重新整理頁面亦會取得最新 `rev` 與特效清單。
 
 ## 示範頁（examples，opt-in）
 
@@ -186,6 +190,8 @@ set SERVE_EXAMPLES=1 && python -m uvicorn server.main:app --port 8000
 
 - `effects/<id>/console.js`：自訂 console 參數 UI、icon、渲染邏輯
 
+修改 `effects/effects.json` 或特效插件後，可呼叫 `POST /api/effects/reload` 手動重載；server 會以 manifest 與 `viewer.js`／`console.js` 內容計算 `rev`。未變更時 `changed` 為 `false`；驗證失敗時保留舊 catalog 並回傳 `400`。
+
 新增特效請參考 `docs/HOW_TO_ADD_EFFECT.md`；完整範例在 `examples/effects/sample-burst/`，最小介面參考 `examples/effects/effect-interface/`。
 
 自動測試預設使用 `tests/fixtures/effects.json`，只包含原四特效：`particle`、`ripple`、`firework`、`text`。新特效加入正式 manifest 後，不會自動進入預設測試。
@@ -195,10 +201,11 @@ set SERVE_EXAMPLES=1 && python -m uvicorn server.main:app --port 8000
 | 路由 | 用途 |
 | --- | --- |
 | `GET /health` | 健康檢查 |
-| `GET /api/effects` | 回傳特效 manifest（schema 已清洗） |
+| `GET /api/effects` | 回傳 `rev` 與清洗後特效 manifest |
+| `POST /api/effects/reload` | 手動重載 manifest；變更時更新 catalog、廣播 SSE `manifest`，並回傳 `changed`、`rev` 與 effect id 清單 |
 | `POST /api/effect` | 送出特效事件 |
 | `POST /api/clear` | 清屏事件 |
-| `GET /api/stream` | viewer SSE 串流 |
+| `GET /api/stream` | viewer SSE 串流（effect / clear / ping / manifest） |
 | `GET /effects/effects.json` | 正式 manifest 檔案 |
 | `GET /effects/{effect_id}/viewer.js` | 特效 viewer plugin |
 | `GET /effects/{effect_id}/console.js` | 特效 console plugin（選用） |
@@ -232,7 +239,9 @@ npx playwright test
 npm run test
 ```
 
-Playwright E2E 會自動啟動 server（port `8123`），並使用 `tests/fixtures/effects.json`，因此預設不會把新特效納入測試。
+目前測試數量：pytest 41 項、node 86 項（`test_console` 52、`test_effect_examples` 16、`test_effects` 18）、Playwright E2E 11 項。
+
+Playwright E2E 會自動啟動 server（port `8123`），並使用 `tests/fixtures/effects.json`，因此預設不會把新特效納入測試。`tests/e2e/reload-manifest.spec.js` 會另啟獨立 server 與 temp manifest，驗證 viewer 自動更新與 console 手動重載／重新整理。`tests/e2e/multi-console-reload.spec.js` 會另啟兩個獨立 server、temp manifest 與不同 `ACCESS_KEY`，驗證不同 server URL / key 的多 Console 端各自重載、被移除 effect 的 selected fallback，且互不影響。
 
 ## 文件
 
