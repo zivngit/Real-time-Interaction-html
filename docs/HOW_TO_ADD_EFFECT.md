@@ -12,6 +12,8 @@
 
 缺少 `console.js` 時，console 核心會依 `params` schema 自動渲染通用控制項。
 
+正式 manifest 目前為 version 2；新增 enabled 特效時，除了 `effects` entry，也應把 effect ID 加入 `currentEffects` 或 `alternateEffects`。若兩者皆未加入，server 仍可將該特效正規化到 `alternateEffects`，但正式 catalog 測試會 warning。
+
 ## 2. 範例參考
 
 | 資料夾 | 用途 |
@@ -26,14 +28,15 @@
 - 只允許 `[A-Za-z0-9_-]+`（見 `server/effects.py` 的 `EFFECT_ID_RE`）。
 - 目錄名 `effects/<effect_id>/` 與 manifest 的 key 必須一致。
 - `viewer`／`console` 欄位值只能是純檔名（不可含路徑分隔符）。
-- `viewer` 檔（預設 `viewer.js`）必須存在，否則 server 啟動失敗（fail-fast）。
+- `viewer` 檔（預設 `viewer.js`）對 `enabled: true` 或省略 `enabled` 的特效必須存在，否則 server 啟動失敗（fail-fast）。
+- `enabled: false` 的特效不會被 server 載入為可發送 effect，也不會檢查 `effects/<effect_id>/viewer.js` 是否存在。
 - `console` 檔（預設 `console.js`）可不存在；不存在時該特效視為無 console 插件（`/api/effects` 回傳 `consoleUrl: null`）。
 
 ## 4. manifest 欄位
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "effects": {
     "<effect_id>": {
       "label": "顯示名稱",
@@ -41,22 +44,30 @@
       "icon": "icon key",
       "viewer": "viewer.js",
       "console": "console.js",
-      "params": {}
+      "params": {},
+      "enabled": true
     }
-  }
+  },
+  "currentEffects": ["<effect_id>"],
+  "alternateEffects": []
 }
 ```
 
 | 欄位 | 必要 | 說明 |
 | --- | --- | --- |
-| `version` | 是 | 固定 `1` |
+| `version` | 是 | `1` 或 `2`；正式 `effects/effects.json` 目前為 `2` |
 | `effects` | 是 | object，key 為 effect ID，不可為空 |
+| `currentEffects` | version 2 必要 | 陣列；console「主要」區塊的 enabled effect ID 順序；不可含未知、停用、重複或與 `alternateEffects` 重複的 ID |
+| `alternateEffects` | version 2 必要 | 陣列；console「次要」區塊的 enabled effect ID 順序；規則同 `currentEffects` |
 | `label` | 否 | 預設使用 effect ID |
 | `category` | 否 | console 分組用 |
 | `icon` | 否 | `console/icons.js` 中 `RTX_EFFECT_ICONS` 的 key（現行：`particle`／`ripple`／`firework`／`text`／`generic`） |
-| `viewer` | 否 | 預設 `viewer.js`；檔案必須存在 |
+| `viewer` | 否 | 預設 `viewer.js`；enabled 特效的檔案必須存在 |
 | `console` | 否 | 預設 `console.js`；檔案不存在則視為無 console 插件 |
 | `params` | 否 | 參數 schema；預設 `{}` |
+| `enabled` | 否 | boolean；缺少視為 `true`。`false` 時該特效不進入 API catalog、不被 viewer 載入、不被 `POST /api/effect` 接受，也不檢查 `viewer.js` 是否存在 |
+
+version 1 manifest 不得包含 `currentEffects` 或 `alternateEffects`；server 會將 version 1 正規化為「所有 enabled effects 放 `currentEffects`、`alternateEffects` 為空」。version 2 中，enabled effect 若未列入任一陣列，server 會自動追加到 `alternateEffects` 後段；正式 catalog 測試會對此 warning。
 
 ## 5. params schema
 
@@ -80,7 +91,7 @@
 
 ## 6. server 驗證行為
 
-server 啟動時驗證 manifest（`version`、effect ID、`viewer` 檔存在）。`POST /api/effect` 收到的 `params` 會依 schema 正規化後才廣播：
+server 啟動時驗證 manifest（`version`、effect ID、`enabled` 型別、enabled 特效的 `viewer` 檔存在、version 2 的 `currentEffects`／`alternateEffects` 合法性）。`POST /api/effect` 收到的 `params` 會依 schema 正規化後才廣播：
 
 | 情境 | 行為 |
 | --- | --- |
@@ -175,7 +186,7 @@ server 靜態路由 `GET /effects/{effect_id}/viewer.js` 與 `GET /effects/{effe
 node --test tests/test_effect_catalog.mjs
 ```
 
-此命令針對正式特效 plugin 做 catalog 級檢查：驗證 `effects/effects.json`、對應 `effects/<effect_id>/viewer.js`、選用 `effects/<effect_id>/console.js`，不需要把新特效加入 `tests/fixtures/effects.json`。
+此命令針對正式特效 plugin 做 catalog 級檢查：驗證 `effects/effects.json`、version 1／2 欄位、`currentEffects`／`alternateEffects`、`enabled` 行為、對應 `effects/<effect_id>/viewer.js`、選用 `effects/<effect_id>/console.js`，不需要把新特效加入 `tests/fixtures/effects.json`。
 
 若要同時納入 API／E2E 預設測試，需更新 `tests/fixtures/effects.json` 後再執行完整專案測試：
 

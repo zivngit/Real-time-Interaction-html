@@ -6,11 +6,11 @@
 
 ```mermaid
 flowchart LR
-    C["examples/embed-console.html（＋embed-both.html）<br/>console/icons.js + console/app.js + console/style.css<br/>examples/theme.css + examples/theme.js<br/>（選用載入 /effects/{id}/console.js 插件）"]
+    C["examples/embed-console.html（＋embed-both.html）<br/>console/icons.js + console/app.js + console/style.css<br/>#rtx-fx-current / #rtx-fx-alternate / #rtx-fx-layout-btn<br/>examples/theme.css + examples/theme.js<br/>（選用載入 /effects/{id}/console.js 插件）"]
     S["server/main.py（app／routes）<br/>server/config.py + security.py + params.py + relay.py + static_files.py<br/>server/effects.py（FastAPI）<br/>effects/effects.json（manifest，可被 RTX_EFFECTS_MANIFEST 覆寫）"]
     V["examples/embed-viewer.html（＋embed-both.html）<br/>viewer/app.js（Effects 未載入時動態載入 viewer/effects.js<br/>載入 /api/effects 後動態載入各 /effects/{id}/viewer.js）<br/>examples/theme.css + examples/theme.js"]
     E["examples/index.html＋theme.css/theme.js<br/>（demo／showcase 索引，opt-in：SERVE_EXAMPLES=1）"]
-    LS[("localStorage<br/>rtx.srvUrl / rtx.srvKey")]
+    LS[("localStorage<br/>rtx.srvUrl / rtx.srvKey / rtx.fx.layout.v2")]
     ET[("localStorage<br/>examples-theme")]
     C -->|"POST /api/effect、POST /api/clear、POST /api/effects/reload"| S
     C -->|"GET /api/effects"| S
@@ -78,7 +78,7 @@ flowchart TD
     subgraph plain["簡單回應"]
         direction LR
         OK["200 {ok, ts}"]
-        LOK["200 {rev, effects}"]
+        LOK["200 {rev, version, effects, currentEffects, alternateEffects}"]
         RLOK["200 {ok, changed, rev, effects}"]
         FR["FileResponse（server/static_files.py；no-store）"]
     end
@@ -126,7 +126,7 @@ sequenceDiagram
     participant S as server（server/main.py）
     participant V as viewer（viewer/app.js）
 
-    Note over C: examples/embed-console.html（＋embed-both.html）載入 /console/style.css＋/console/icons.js＋/console/app.js\n初始化 → loadEffects() fetch /api/effects\n成功 → loadConsolePlugins()（依 consoleUrl 動態載入 /effects/{id}/console.js，失敗僅 log 回退）→ renderEffects() 動態建立特效按鈕（icon 優先序：插件 iconSVG → 插件 iconID → manifest icon → RTX_EFFECT_ICONS[type] → generic → fallback；未知特效 generic）\n失敗/空表 → fallback 內建特效\nrenderParams()：已註冊 console 插件優先 plugin.render()，否則依 schema 渲染（editable:false 與 array 不顯示）\nparamsBtn / connBtn → bindToggle()（展開時 applyFabPos()）\napplyFabPos() → panelCandidates() 選最小重疊位置；FAB z-index 高於 panel
+    Note over C: examples/embed-console.html（＋embed-both.html）載入 /console/style.css＋/console/icons.js＋/console/app.js\n初始化 → loadEffects() fetch /api/effects\n成功 → loadConsolePlugins()（依 consoleUrl 動態載入 /effects/{id}/console.js，失敗僅 log 回退）→ renderEffects(meta, payload, persist) 以 server 正規化 currentEffects／alternateEffects 渲染 #rtx-fx-current／#rtx-fx-alternate（icon 優先序：插件 iconSVG → 插件 iconID → manifest icon → RTX_EFFECT_ICONS[type] → generic → fallback；未知特效 generic）\nlayout 優先序：localStorage rtx.fx.layout.v2 → server payload layout → v1／fallback 全 current；sanitizeLayout() 移除未知、重複、disabled 與 stale IDs\n#rtx-fx-layout-btn → toggle #rtx-fx-alternate.open\n拖曳 drop 或 window.__rtxConsoleLayout.move(effectId, targetBlock, beforeId) → moveEffect() → syncLayoutFromDom()／saveLayout()／renderFxZone()\n失敗/空表 → fallback 內建特效\nrenderParams()：已註冊 console 插件優先 plugin.render()，否則依 schema 渲染（editable:false 與 array 不顯示）\nparamsBtn / connBtn → bindToggle()（展開時 applyFabPos()）\napplyFabPos() → panelCandidates() 選最小重疊位置；FAB z-index 高於 panel
     Note over V: examples/embed-viewer.html（＋embed-both.html）載入 /viewer/app.js\n/viewer/app.js 若 Effects 未載入會動態載入 /viewer/effects.js\nfetch /api/effects → 並行動態載入各 /effects/{id}/viewer.js（單一失敗僅 log 並跳過該特效）
     Note over C: 手動重載：展開 #rtx-conn-panel → 點擊 SVG #rtx-reload-btn → POST /api/effects/reload → GET /api/effects → applyManifest(rev, resetRegistry=true)
     C->>S: POST /api/effects/reload
@@ -208,6 +208,9 @@ classDiagram
         +MANIFEST
         +EFFECTS
         +MANIFEST_REV
+        +MANIFEST_VERSION
+        +MANIFEST_CURRENT_EFFECTS
+        +MANIFEST_ALTERNATE_EFFECTS
         +load_manifest()
         +reload_effects()
     }
@@ -252,6 +255,7 @@ classDiagram
         +stream()
     }
     class Console {
+        +fxLayoutState
         +saveCfg()
         +applyFabPos()
         +panelCandidates()
@@ -267,11 +271,21 @@ classDiagram
         +fieldDefs(type)
         +renderParams()
         +selectEffect(type)
-        +renderEffects(meta)
+        +fallbackLayout(effectKeys)
+        +storedLayout()
+        +saveLayout()
+        +normalizeLayout(data)
+        +sanitizeLayout(layout, effectKeys)
+        +zoneTypes(zone)
+        +syncLayoutFromDom()
+        +moveEffect(effectId, targetBlock, beforeId)
+        +makeFxButton(type, zone)
+        +renderFxZone()
+        +renderEffects(meta, payload, persist)
         +normalizeEffects(data)
         +loadEffects()
         +loadConsolePlugins(meta, rev)
-        +applyManifest(meta, rev, resetRegistry)
+        +applyManifest(meta, rev, payload, resetRegistry)
         +reloadEffectsTable()
         +bindToggle(btn, box)
         +headers()
@@ -283,7 +297,7 @@ classDiagram
     Effects ..> Effect : 依 manifest 動態建立 effects/*/viewer.js 特效
     Console ..> ConsolePlugin : 選用 render／iconID／iconSVG（缺失時 schema 渲染／manifest icon）
     Console ..> Server : POST /api/effect / POST /api/clear / POST /api/effects/reload
-    Server ..> EffectCatalog : 讀取 EFFECTS / MANIFEST / MANIFEST_REV / MANIFEST_PATH；reload_effects()
+    Server ..> EffectCatalog : 讀取 EFFECTS / MANIFEST / MANIFEST_REV / MANIFEST_VERSION / MANIFEST_CURRENT_EFFECTS / MANIFEST_ALTERNATE_EFFECTS / MANIFEST_PATH；reload_effects()
     Server ..> ServerConfig : ACCESS_KEY / RATE_LIMIT_PER_SEC
     Server ..> Security : check_key()
     Server ..> Params : normalize_params()
@@ -299,15 +313,15 @@ classDiagram
 
 ```mermaid
 flowchart LR
-    TF["tests/fixtures/effects.json<br/>測試 manifest（固定原四特效）"]
-    TA["tests/test_api.py<br/>pytest＋TestClient（41）<br/>fixture manifest 與 temp reload manifest"] --> M["server/main.py<br/>＋server/config.py、security.py、params.py、relay.py、static_files.py、effects.py"]
+    TF["tests/fixtures/effects.json＋effects-v2.json<br/>v1／v2 測試 manifest"]
+    TA["tests/test_api.py<br/>pytest＋TestClient（46）<br/>v1／v2 fixture manifest、enabled filtering、layout 正規化、temp reload manifest"] --> M["server/main.py<br/>＋server/config.py、security.py、params.py、relay.py、static_files.py、effects.py"]
     TA --> TF
     TE["tests/test_effects.mjs<br/>node --test＋vm（18）"] --> S["viewer/effects.js ＋ effects/*/viewer.js"]
-    TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（54）"] --> K["console/app.js ＋ effects/*/console.js"]
+    TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（63）<br/>v1／v2 payload、雙區渲染、layout button、fx drag、fx drag 往返、move hook、localStorage"] --> K["console/app.js ＋ effects/*/console.js"]
     TX["tests/test_effect_examples.mjs<br/>node --test＋vm fake sandbox（16）"] --> X["examples/effects/*/effects.json ＋ viewer.js ＋ console.js"]
     TG["tests/test_effect_catalog.mjs<br/>node --test＋vm（1）<br/>正式 effects/effects.json、effects/*/viewer.js、選用 console.js"] --> S
     TG --> K
-    TP["tests/e2e/*.spec.js<br/>Playwright E2E（14）<br/>預設 webServer port 8123<br/>reload-manifest.spec.js 另啟獨立 server＋temp manifest<br/>multi-console-reload.spec.js 另啟兩個獨立 server／key＋selected fallback"] --> M
+    TP["tests/e2e/*.spec.js<br/>Playwright E2E（22）<br/>預設 webServer port 8123<br/>fx-layout.spec.js 驗證 v2 雙區、move、fx drag 往返、空次要區拖曳、localStorage、reload fallback<br/>reload-manifest.spec.js 另啟獨立 server＋temp manifest<br/>multi-console-reload.spec.js 另啟兩個獨立 server／key＋selected fallback"] --> M
     TP --> K
     TP --> S
     TP --> TF

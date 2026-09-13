@@ -17,6 +17,8 @@ import server.effects
 import server.main as m
 import server.relay as relay
 
+EFFECTS_V2 = Path(__file__).resolve().parent / "fixtures" / "effects-v2.json"
+
 
 def _free_port() -> int:
     s = socket.socket()
@@ -91,6 +93,9 @@ def reload_catalog(tmp_path, monkeypatch):
     old_manifest = copy.deepcopy(server.effects.MANIFEST)
     old_effects = copy.deepcopy(server.effects.EFFECTS)
     old_rev = server.effects.MANIFEST_REV
+    old_version = server.effects.MANIFEST_VERSION
+    old_current = server.effects.MANIFEST_CURRENT_EFFECTS[:]
+    old_alternate = server.effects.MANIFEST_ALTERNATE_EFFECTS[:]
     server.effects.reload_effects()
 
     yield {
@@ -106,6 +111,9 @@ def reload_catalog(tmp_path, monkeypatch):
     server.effects.EFFECTS.clear()
     server.effects.EFFECTS.update(old_effects)
     server.effects.MANIFEST_REV = old_rev
+    server.effects.MANIFEST_VERSION = old_version
+    server.effects.MANIFEST_CURRENT_EFFECTS = old_current
+    server.effects.MANIFEST_ALTERNATE_EFFECTS = old_alternate
 
 
 def test_health(client):
@@ -147,6 +155,64 @@ def test_effects_list_includes_rev(client):
     body = r.json()
     assert isinstance(body["rev"], str)
     assert body["rev"]
+
+
+def test_effects_list_includes_v1_layout(client):
+    r = client.get("/api/effects")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["version"] == 1
+    assert body["currentEffects"] == ["particle", "ripple", "firework", "text"]
+    assert body["alternateEffects"] == []
+
+
+def test_reload_v2_exposes_layout_and_excludes_disabled(client, reload_catalog):
+    reload_catalog["use"](EFFECTS_V2)
+    r = client.post("/api/effects/reload")
+    assert r.status_code == 200
+    assert r.json()["changed"] is True
+    body = client.get("/api/effects").json()
+    assert body["version"] == 2
+    assert body["currentEffects"] == ["particle", "ripple"]
+    assert body["alternateEffects"] == ["firework", "text"]
+    assert set(body["effects"]) == {"particle", "ripple", "firework", "text"}
+    assert "legacy" not in body["effects"]
+
+
+def test_reload_v2_appends_enabled_effect_omitted_from_layout(client, reload_catalog, tmp_path):
+    raw = json.loads(EFFECTS_V2.read_text(encoding="utf-8"))
+    raw["alternateEffects"] = ["firework"]
+    path = tmp_path / "v2-omitted.json"
+    path.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+    reload_catalog["use"](path)
+    r = client.post("/api/effects/reload")
+    assert r.status_code == 200
+    body = client.get("/api/effects").json()
+    assert body["currentEffects"] == ["particle", "ripple"]
+    assert body["alternateEffects"] == ["firework", "text"]
+
+
+def test_reload_invalid_v2_layout_preserves_old_catalog(client, reload_catalog, tmp_path):
+    before = client.get("/api/effects").json()
+    raw = json.loads(EFFECTS_V2.read_text(encoding="utf-8"))
+    raw["currentEffects"] = ["particle", "missing"]
+    path = tmp_path / "v2-invalid.json"
+    path.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+    reload_catalog["use"](path)
+    r = client.post("/api/effects/reload")
+    assert r.status_code == 400
+    after = client.get("/api/effects").json()
+    assert after["rev"] == before["rev"]
+    assert after["version"] == 1
+    assert set(after["effects"]) == {"particle", "ripple", "firework", "text"}
+
+
+def test_post_effect_rejects_disabled_effect(client, reload_catalog):
+    reload_catalog["use"](EFFECTS_V2)
+    client.post("/api/effects/reload")
+    m.rate_limiter.reset()
+    r = client.post("/api/effect", json={"effect": "legacy", "x": 50, "y": 50})
+    assert r.status_code == 400
 
 
 def test_reload_success_updates_rev_and_catalog(client, reload_catalog):

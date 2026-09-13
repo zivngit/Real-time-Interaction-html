@@ -12,7 +12,7 @@
 
 - SSE 斷線期間特效遺失（規格：不重播）
 - 限頻為全域滑動視窗（未區分客戶端）
-- 前端（console/viewer）已有 Playwright 瀏覽器 E2E（`tests/e2e/`，14 項）；console 另有 node vm 冒煙測試（`tests/test_console.mjs`，54 項），viewer 另有 node vm 冒煙測試（`tests/test_effects.mjs`，18 項），特效範例另有 node vm 冒煙測試（`tests/test_effect_examples.mjs`，16 項），正式 catalog 另有 node vm 驗證測試（`tests/test_effect_catalog.mjs`，1 項）
+- 前端（console/viewer）已有 Playwright 瀏覽器 E2E（`tests/e2e/`，22 項）；console 另有 node vm 冒煙測試（`tests/test_console.mjs`，63 項），viewer 另有 node vm 冒煙測試（`tests/test_effects.mjs`，18 項），特效範例另有 node vm 冒煙測試（`tests/test_effect_examples.mjs`，16 項），正式 catalog 另有 node vm 驗證測試（`tests/test_effect_catalog.mjs`，1 項）
 
 ## 第一階段：建立可維護的執行基礎
 
@@ -61,6 +61,7 @@
 - [x] examples 淺色／深色主題切換：新增 `examples/theme.css`、`examples/theme.js`，四個 example HTML 加入右上角主題切換、`localStorage` 記憶與系統偏好 fallback；更新 API 測試、Playwright E2E、README 與 CALL_GRAPH（2026-09-12）
 - [x] effects catalog 自動檢測與正式特效擴充：新增 `tests/test_effect_catalog.mjs` 動態驗證正式 `effects/effects.json`、`effects/<id>/viewer.js`、選用 `console.js`、manifest/plugin 一致性、param schema、viewer smoke run、console render 與 icon/source warnings；納入 `chrono-vortex`、`pixel-melt`、`hyper-warp`、`aurora`、`fire-dragon`、`orbital-strike`、`magic-circle` 7 個正式特效；修正 `slash`／`tear-slash` 的 viewer defaults；`package.json test:unit` 納入新測試（2026-09-13）
 - [x] effects catalog 測試訊息中文化：將 `tests/test_effect_catalog.mjs` 的 warning、error message 與測試標題改為中文顯示，測試邏輯維持不變（2026-09-13）
+- [x] effects manifest v2 與 console 雙區特效布局：server `GET /api/effects` 回傳 `version`、`currentEffects`、`alternateEffects`；`effects/effects.json` 升級 v2；個別特效可設定 `enabled`，停用時不進入 API catalog、不被 viewer 載入、不被 `POST /api/effect` 接受；console 將原 `#rtx-fx-buttons` 改為 `#rtx-fx-current` 與 `#rtx-fx-alternate`，新增 `#rtx-fx-layout-btn` 展開/收合次要區塊，支援拖曳與 `window.__rtxConsoleLayout.move` 移動特效並寫入 `rtx.fx.layout.v2`；console 測試涵蓋 move hook、dragover/drop 拖曳布局與移入次要區再移回主要區；`.rtx-fx-zone` 增加 `min-height: 52px`，確保空區域仍可作為拖曳目標；`#rtx-fx-alternate.open` 增加 dashed border、background 與圓角，使次要區可被明確區分；新增 `tests/fixtures/effects-v2.json` 與 `tests/e2e/fx-layout.spec.js`，Playwright E2E 亦涵蓋 browser drag 往返、空次要區拖曳並更新為 22 項（2026-09-13）
 - [ ] 處理 pytest 的 2 個第三方 deprecation warnings：評估加入 `httpx2` 並限制 `anyio>=4.10,<4.15`（已用 temp dependencies 驗證可消除 warnings；2026-09-11 暫不處理）
 - [ ] server 斷線重播暫存（最近 N 則）
 - [ ] viewer 狀態回報（POST /api/status）

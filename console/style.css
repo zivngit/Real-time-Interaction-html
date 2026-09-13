@@ -9,11 +9,16 @@
 #rtx-panel { position: fixed; left: 12px; top: 66px; z-index: 2147483646; background: rgba(20, 26, 32, 0.92); color: #dfe7ee; border: 1px solid #2c3a46; border-radius: 10px; padding: 12px 14px; width: 280px; box-shadow: 0 6px 24px rgba(0,0,0,0.4); user-select: none; opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity 0.15s ease, transform 0.15s ease; }
 #rtx-panel.open { opacity: 1; transform: none; pointer-events: auto; }
 #rtx-panel h1 { font-size: 13px; margin: 0 0 10px; color: #8fb6d9; letter-spacing: 1px; }
-#rtx-fx-buttons { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; max-height: 180px; overflow-y: auto; justify-items: center; align-items: center; scrollbar-width: thin; scrollbar-color: #33475a transparent; }
-#rtx-fx-buttons::-webkit-scrollbar { width: 8px; }
-#rtx-fx-buttons::-webkit-scrollbar-track { background: transparent; }
-#rtx-fx-buttons::-webkit-scrollbar-thumb { background: #33475a; border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
-#rtx-fx-buttons::-webkit-scrollbar-thumb:hover { background: #4d6a86; border: 2px solid transparent; background-clip: content-box; }
+#rtx-fx-layout { margin-bottom: 8px; }
+.rtx-fx-zone { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; min-height: 52px; max-height: 180px; overflow-y: auto; justify-items: center; align-items: center; scrollbar-width: thin; scrollbar-color: #33475a transparent; }
+#rtx-fx-current { margin-bottom: 8px; }
+#rtx-fx-alternate { display: none; }
+#rtx-fx-alternate.open { display: grid; margin-bottom: 8px; padding: 6px; background: rgba(110, 163, 216, 0.08); border: 1px dashed #6ea3d8; border-radius: 8px; }
+.rtx-fx-zone::-webkit-scrollbar { width: 8px; }
+.rtx-fx-zone::-webkit-scrollbar-track { background: transparent; }
+.rtx-fx-zone::-webkit-scrollbar-thumb { background: #33475a; border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
+.rtx-fx-zone::-webkit-scrollbar-thumb:hover { background: #4d6a86; border: 2px solid transparent; background-clip: content-box; }
+.rtx-fx.dragging { opacity: 0.65; }
 .rtx-row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .rtx-fx { width: 52px; height: 52px; border-radius: 50%; padding: 0; background: #1b2530; border: 1px solid #33475a; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .rtx-fx svg { width: 26px; height: 26px; stroke: #dfe7ee; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; }

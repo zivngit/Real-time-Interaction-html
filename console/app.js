@@ -50,8 +50,12 @@
   h1.textContent = "控制端 (console)";
   panel.appendChild(h1);
 
-  var fxButtons = make("div", "rtx-fx-buttons", "rtx-fx-buttons");
-  panel.appendChild(fxButtons);
+  var fxLayout = make("div", "rtx-fx-layout", "rtx-fx-layout");
+  var fxCurrent = make("div", "rtx-fx-current", "rtx-fx-zone");
+  var fxAlternate = make("div", "rtx-fx-alternate", "rtx-fx-zone");
+  fxLayout.appendChild(fxCurrent);
+  fxLayout.appendChild(fxAlternate);
+  panel.appendChild(fxLayout);
 
   var row = make("div", null, "rtx-row");
   panel.appendChild(row);
@@ -77,6 +81,14 @@
   clearBtn.setAttribute("aria-label", "清屏");
   clearBtn.innerHTML = uiIcon("clear");
   row.appendChild(clearBtn);
+
+  var layoutBtn = make("button", "rtx-fx-layout-btn", "rtx-action");
+  layoutBtn.setAttribute("aria-expanded", "false");
+  layoutBtn.setAttribute("aria-controls", "rtx-fx-alternate");
+  layoutBtn.title = "切換備用特效區";
+  layoutBtn.setAttribute("aria-label", "切換備用特效區");
+  layoutBtn.innerHTML = uiIcon("layout");
+  row.appendChild(layoutBtn);
 
   var paramsPanel = make("div", "rtx-params-panel", "rtx-collapsible");
   var paramsBody = make("div", "rtx-params-body");
@@ -294,9 +306,182 @@
   };
 
   var EFFECTS_META = FALLBACK_EFFECTS;
+  var fxLayoutState = { current: Object.keys(FALLBACK_EFFECTS).slice(), alternate: [] };
   var fxButtonEls = [];
   var selected = Object.keys(EFFECTS_META)[0];
   var currentRev = "";
+  var fxDragId = null;
+  var FX_LAYOUT_STORAGE_KEY = "rtx.fx.layout.v2";
+
+  function fallbackLayout(effectKeys) {
+    return { current: (effectKeys || []).slice(), alternate: [] };
+  }
+
+  function storedLayout() {
+    try {
+      var raw = localStorage.getItem(FX_LAYOUT_STORAGE_KEY);
+      if (!raw) return null;
+      var parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return null;
+      if (!Array.isArray(parsed.current) || !Array.isArray(parsed.alternate)) return null;
+      return { current: parsed.current, alternate: parsed.alternate };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveLayout() {
+    try {
+      localStorage.setItem(
+        FX_LAYOUT_STORAGE_KEY,
+        JSON.stringify({
+          version: 2,
+          current: fxLayoutState.current,
+          alternate: fxLayoutState.alternate,
+        })
+      );
+    } catch (e) {}
+  }
+
+  function normalizeLayout(data) {
+    if (!data || typeof data !== "object") return null;
+    if (data.version === 1) return null;
+    if (data.version !== 2) return null;
+    if (!Array.isArray(data.currentEffects) || !Array.isArray(data.alternateEffects)) return null;
+    return { current: data.currentEffects, alternate: data.alternateEffects };
+  }
+
+  function sanitizeLayout(layout, keys) {
+    var effectKeys = keys || [];
+    var fallback = fallbackLayout(effectKeys);
+    if (!layout || typeof layout !== "object") return fallback;
+    if (!Array.isArray(layout.current) || !Array.isArray(layout.alternate)) return fallback;
+    var currentSeen = {};
+    var alternateSeen = {};
+    var current = [];
+    var alternate = [];
+    (layout.current || []).forEach(function (id) {
+      if (typeof id !== "string" || !EFFECTS_META[id] || currentSeen[id]) return;
+      currentSeen[id] = true;
+      current.push(id);
+    });
+    (layout.alternate || []).forEach(function (id) {
+      if (typeof id !== "string" || !EFFECTS_META[id] || currentSeen[id] || alternateSeen[id]) return;
+      alternateSeen[id] = true;
+      alternate.push(id);
+    });
+    if (!current.length && !alternate.length) return fallback;
+    if (!current.length) {
+      current = alternate;
+      alternate = [];
+      current.forEach(function (id) {
+        currentSeen[id] = true;
+      });
+    }
+    effectKeys.forEach(function (id) {
+      if (!currentSeen[id] && !alternateSeen[id]) {
+        alternateSeen[id] = true;
+        alternate.push(id);
+      }
+    });
+    return { current: current, alternate: alternate };
+  }
+
+  function zoneTypes(zone) {
+    var out = [];
+    var nodes = zone.children || zone._children || [];
+    for (var i = 0; i < nodes.length; i += 1) {
+      var n = nodes[i];
+      if (!n || typeof n.getAttribute !== "function") continue;
+      var id = n.getAttribute("data-fx");
+      if (EFFECTS_META[id]) out.push(id);
+    }
+    return out;
+  }
+
+  function syncLayoutFromDom() {
+    fxLayoutState = sanitizeLayout(
+      { current: zoneTypes(fxCurrent), alternate: zoneTypes(fxAlternate) },
+      Object.keys(EFFECTS_META)
+    );
+    saveLayout();
+    renderFxZone();
+    selectEffect(selected);
+  }
+
+  function moveEffect(effectId, targetBlock, beforeId) {
+    if (!EFFECTS_META[effectId]) return false;
+    if (targetBlock !== "current" && targetBlock !== "alternate") return false;
+    var current = fxLayoutState.current.filter(function (id) {
+      return id !== effectId;
+    });
+    var alternate = fxLayoutState.alternate.filter(function (id) {
+      return id !== effectId;
+    });
+    function insert(list, before) {
+      if (before == null) {
+        list.push(effectId);
+        return true;
+      }
+      var idx = list.indexOf(before);
+      if (idx === -1) return false;
+      list.splice(idx, 0, effectId);
+      return true;
+    }
+    if (targetBlock === "current") {
+      if (!insert(current, beforeId)) return false;
+    } else {
+      if (!insert(alternate, beforeId)) return false;
+    }
+    fxLayoutState = sanitizeLayout({ current: current, alternate: alternate }, Object.keys(EFFECTS_META));
+    saveLayout();
+    renderFxZone();
+    selectEffect(selected);
+    return true;
+  }
+
+  function makeFxButton(type, zone) {
+    var e = EFFECTS_META[type] || {};
+    var name = e.name || type;
+    var hasIcon = hasIconFor(type, e);
+    var btn = make("button", "rtx-fx-" + type, "rtx-fx" + (hasIcon ? "" : " generic"));
+    btn.setAttribute("data-fx", type);
+    btn.title = name;
+    btn.setAttribute("aria-label", name);
+    btn.innerHTML = iconFor(type, e);
+    btn.draggable = true;
+    btn.addEventListener("click", function () {
+      selectEffect(type);
+    });
+    btn.addEventListener("dragstart", function (dragEvent) {
+      fxDragId = type;
+      btn.classList.add("dragging");
+      if (dragEvent && dragEvent.dataTransfer) {
+        if (dragEvent.dataTransfer.setData) dragEvent.dataTransfer.setData("text/plain", type);
+        dragEvent.dataTransfer.effectAllowed = "move";
+      }
+    });
+    btn.addEventListener("dragend", function () {
+      btn.classList.remove("dragging");
+      fxDragId = null;
+      syncLayoutFromDom();
+    });
+    zone.appendChild(btn);
+    fxButtonEls.push(btn);
+    return btn;
+  }
+
+  function renderFxZone() {
+    fxButtonEls = [];
+    fxCurrent.innerHTML = "";
+    fxAlternate.innerHTML = "";
+    fxLayoutState.current.forEach(function (type) {
+      makeFxButton(type, fxCurrent);
+    });
+    fxLayoutState.alternate.forEach(function (type) {
+      makeFxButton(type, fxAlternate);
+    });
+  }
 
   function isSchema(params) {
     if (!params || typeof params !== "object" || Array.isArray(params)) return false;
@@ -434,7 +619,9 @@
   }
 
   function selectEffect(type) {
-    if (!EFFECTS_META[type]) type = Object.keys(EFFECTS_META)[0];
+    if (!EFFECTS_META[type]) {
+      type = fxLayoutState.current[0] || fxLayoutState.alternate[0] || Object.keys(EFFECTS_META)[0];
+    }
     selected = type;
     fxButtonEls.forEach(function (btn) {
       var on = btn.getAttribute("data-fx") === selected;
@@ -444,25 +631,14 @@
     renderParams();
   }
 
-  function renderEffects(meta) {
+  function renderEffects(meta, payload, persist) {
     EFFECTS_META = meta;
-    fxButtons.innerHTML = "";
-    fxButtonEls = [];
-    Object.keys(EFFECTS_META).forEach(function (type) {
-      var e = EFFECTS_META[type] || {};
-      var name = e.name || type;
-      var hasIcon = hasIconFor(type, e);
-      var btn = make("button", "rtx-fx-" + type, "rtx-fx" + (hasIcon ? "" : " generic"));
-      btn.setAttribute("data-fx", type);
-      btn.title = name;
-      btn.setAttribute("aria-label", name);
-      btn.innerHTML = iconFor(type, e);
-      btn.addEventListener("click", function () {
-        selectEffect(type);
-      });
-      fxButtons.appendChild(btn);
-      fxButtonEls.push(btn);
-    });
+    var effectKeys = Object.keys(EFFECTS_META);
+    var stored = storedLayout();
+    var payloadLayout = normalizeLayout(payload);
+    fxLayoutState = sanitizeLayout(stored || payloadLayout || null, effectKeys);
+    if (persist) saveLayout();
+    renderFxZone();
     selectEffect(selected);
   }
 
@@ -516,7 +692,7 @@
     return Promise.all(jobs);
   }
 
-  async function applyManifest(meta, rev, resetRegistry) {
+  async function applyManifest(meta, rev, payload, resetRegistry) {
     if (rev && rev === currentRev) return;
     if (resetRegistry) {
       Object.keys(consoleRegistry.registry).forEach(function (key) {
@@ -524,7 +700,7 @@
       });
     }
     await loadConsolePlugins(meta, rev);
-    renderEffects(meta);
+    renderEffects(meta, payload, true);
     if (rev) {
       currentRev = rev;
     }
@@ -537,7 +713,7 @@
       var data = await r.json();
       var meta = normalizeEffects(data);
       if (meta) {
-        await applyManifest(meta, (data && data.rev) || "", false);
+        await applyManifest(meta, (data && data.rev) || "", data, false);
       }
     } catch (err) {
       console.warn("[control] 特效表載入失敗，使用內建清單", err);
@@ -570,7 +746,7 @@
       var data = await metaResp.json();
       var meta = normalizeEffects(data);
       if (meta) {
-        await applyManifest(meta, (data && data.rev) || "", true);
+        await applyManifest(meta, (data && data.rev) || "", data, true);
       }
       console.info("[control] 特效表已重載", resp);
     } catch (err) {
@@ -580,9 +756,45 @@
     }
   }
 
-  renderEffects(FALLBACK_EFFECTS);
+  renderEffects(FALLBACK_EFFECTS, null, false);
   applyFabPos();
   window.__rtxConsoleReady = loadEffects();
+
+  [fxCurrent, fxAlternate].forEach(function (zone) {
+    zone.addEventListener("dragover", function (dragEvent) {
+      dragEvent.preventDefault();
+      if (dragEvent.dataTransfer) dragEvent.dataTransfer.dropEffect = "move";
+      if (!fxDragId) return;
+      var dragged = null;
+      fxButtonEls.forEach(function (btn) {
+        if (btn.getAttribute("data-fx") === fxDragId) dragged = btn;
+      });
+      if (!dragged) return;
+      var after = document.elementFromPoint
+        ? document.elementFromPoint(dragEvent.clientX, dragEvent.clientY)
+        : null;
+      var ref = after && after.closest ? after.closest(".rtx-fx") : null;
+      if (ref && ref !== dragged && zone.contains && zone.contains(ref)) {
+        zone.insertBefore(dragged, ref);
+      } else {
+        zone.appendChild(dragged);
+      }
+    });
+    zone.addEventListener("drop", function (dragEvent) {
+      dragEvent.preventDefault();
+      if (fxDragId) syncLayoutFromDom();
+    });
+  });
+
+  window.__rtxConsoleLayout = {
+    getCurrent: function () {
+      return fxLayoutState.current.slice();
+    },
+    getAlternate: function () {
+      return fxLayoutState.alternate.slice();
+    },
+    move: moveEffect,
+  };
 
   function bindToggle(btn, box) {
     btn.addEventListener("click", function () {
@@ -594,6 +806,7 @@
   }
   bindToggle(paramsBtn, paramsPanel);
   bindToggle(connBtn, connPanel);
+  bindToggle(layoutBtn, fxAlternate);
 
   function headers() {
     var h = { "Content-Type": "application/json" };

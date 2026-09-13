@@ -1,5 +1,23 @@
 {
-  "version": 1,
+  "version": 2,
+  "currentEffects": [
+    "particle",
+    "ripple",
+    "firework",
+    "text",
+    "slash",
+    "vortex",
+    "chrono-vortex",
+    "tear-slash",
+    "rocket",
+    "pixel-melt",
+    "hyper-warp",
+    "aurora",
+    "fire-dragon",
+    "orbital-strike",
+    "magic-circle"
+  ],
+  "alternateEffects": [],
   "effects": {
     "particle": {
       "label": "粒子爆散",
@@ -585,6 +603,7 @@
       "category": "magic",
       "viewer": "viewer.js",
       "console": "console.js",
+      "enabled": false,
       "params": {
         "color1": {
           "type": "color",

@@ -31,7 +31,7 @@ export async function openConsolePage(page) {
   for (const effect of TEST_EFFECTS) {
     await expect(page.locator(`#rtx-fx-${effect}`)).toBeVisible();
   }
-  await expect(page.locator(".rtx-fx")).toHaveCount(TEST_EFFECTS.length);
+  await expect(page.locator("#rtx-fx-current .rtx-fx")).toHaveCount(TEST_EFFECTS.length);
 }
 
 export async function openViewerPage(page) {
@@ -45,8 +45,15 @@ export async function openViewerPage(page) {
 
 export async function selectEffect(page, effectId) {
   await ensurePanelOpen(page);
-  await page.locator(`#rtx-fx-${effectId}`).click();
-  await expect(page.locator(`#rtx-fx-${effectId}`)).toHaveClass(/selected/);
+  const btn = page.locator(`#rtx-fx-${effectId}`);
+  if (!(await btn.isVisible())) {
+    const layoutBtn = page.locator("#rtx-fx-layout-btn");
+    if ((await layoutBtn.getAttribute("aria-expanded")) === "false") {
+      await layoutBtn.click();
+    }
+  }
+  await btn.click();
+  await expect(btn).toHaveClass(/selected/);
 }
 
 export async function clickEffectAt(page, x, y) {

@@ -50,7 +50,13 @@ async def health() -> dict:
 
 @app.get("/api/effects")
 async def list_effects() -> dict:
-    return {"rev": effects.MANIFEST_REV, "effects": EFFECTS}
+    return {
+        "rev": effects.MANIFEST_REV,
+        "version": effects.MANIFEST_VERSION,
+        "effects": EFFECTS,
+        "currentEffects": effects.MANIFEST_CURRENT_EFFECTS,
+        "alternateEffects": effects.MANIFEST_ALTERNATE_EFFECTS,
+    }
 
 
 @app.post("/api/effects/reload")
@@ -67,7 +73,10 @@ async def reload_manifest(x_access_key: str | None = Header(default=None)) -> di
                 "id": str(uuid.uuid4()),
                 "type": "manifest",
                 "rev": rev,
+                "version": effects.MANIFEST_VERSION,
                 "effects": new_effects,
+                "currentEffects": effects.MANIFEST_CURRENT_EFFECTS,
+                "alternateEffects": effects.MANIFEST_ALTERNATE_EFFECTS,
                 "ts": int(time.time()),
             }
         )

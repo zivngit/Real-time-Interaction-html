@@ -19,6 +19,9 @@ test("fx buttons are clickable for 1, 8, 20, and 50 effects", async ({ page }) =
   const errors = trackPageErrors(page);
   let currentCount = 0;
 
+  await page.addInitScript(() => {
+    window.localStorage.removeItem("rtx.fx.layout.v2");
+  });
   await page.route(/\/api\/effects$/, (route) =>
     route.fulfill({
       status: 200,
@@ -34,14 +37,14 @@ test("fx buttons are clickable for 1, 8, 20, and 50 effects", async ({ page }) =
     currentCount = count;
     await page.goto("/examples/embed-console.html");
 
-    const buttons = page.locator("#rtx-fx-buttons .rtx-fx");
+    const buttons = page.locator("#rtx-fx-current .rtx-fx");
     await expect(buttons).toHaveCount(count);
     await ensurePanelOpen(page);
 
     for (let i = 0; i < count; i += 1) {
       await buttons.nth(i).click();
       await expect(buttons.nth(i)).toHaveClass(/selected/);
-      await expect(page.locator("#rtx-fx-buttons .rtx-fx.selected")).toHaveCount(1);
+      await expect(page.locator("#rtx-fx-current .rtx-fx.selected")).toHaveCount(1);
     }
   }
 

@@ -5,8 +5,8 @@
 ## 專案特色
 
 - **可嵌入 viewer**：只要一行 `<script>` 即可在任意網頁加上即時特效顯示層，canvas 不擋宿主網頁操作。
-- **可嵌入 console**：以浮動按鈕＋面板控制特效，支援選特效、調參數、清屏、拖曳移動位置。
-- **manifest 驅動特效**：特效清單集中在 `effects/effects.json`；新增特效主要新增 manifest entry 與 `effects/<id>/viewer.js`，不需改 server／console 核心。
+- **可嵌入 console**：以浮動按鈕＋面板控制特效，支援選特效、調參數、清屏、拖曳移動位置；console 可將特效放在「主要」與「次要」兩個區塊，並以 `localStorage` 記憶個人布局。
+- **manifest 驅動特效**：特效清單集中在 `effects/effects.json`；正式 manifest 支援 version 1／2，version 2 以 `currentEffects`／`alternateEffects` 定義 console 雙區布局，個別特效可用 `enabled: false` 停用；新增特效主要新增 manifest entry 與 `effects/<id>/viewer.js`，不需改 server／console 核心。
 - **manifest 手動重載**：`POST /api/effects/reload` 重新讀取 manifest 與插件 fingerprint；viewer 透過 SSE `manifest` 自動更新，console 於［連線設定］展開後點「重載」或頁面重新整理套用。
 - **params schema 驗證**：server 依 manifest 參數型別驗證，無效值回退預設值。
 - **多 viewer 廣播**：console 送出事件後，server 以 SSE 推送給所有已連線 viewer。
@@ -91,7 +91,8 @@ project/
 │   ├── test_console.mjs     # node：console DOM 行為
 │   ├── test_effect_examples.mjs
 │   ├── test_effect_catalog.mjs
-│   ├── fixtures/effects.json # 測試用 manifest（固定原四特效）
+│   ├── fixtures/effects.json # v1 測試 manifest（固定原四特效）
+│   ├── fixtures/effects-v2.json # v2 測試 manifest（layout 與 enabled 行為）
 │   └── e2e/                 # Playwright 瀏覽器 E2E
 ├── docs/
 │   ├── HOW_TO_ADD_EFFECT.md # 新增特效指南
@@ -154,6 +155,8 @@ window.CONTROL_CONFIG = {
 
 console 面板於［連線設定］下拉面板內提供 SVG［重載］按鈕，手動呼叫 `POST /api/effects/reload` 後重新套用 manifest 與 console 插件。console 不透過 SSE 自動重載；重新整理頁面亦會取得最新 `rev` 與特效清單。
 
+console 特效按鈕以 `#rtx-fx-current`（主要）與 `#rtx-fx-alternate`（次要）兩個區塊呈現；`#rtx-fx-layout-btn` 可展開或收合次要區塊。拖曳特效按鈕或呼叫 `window.__rtxConsoleLayout.move(effectId, "current" | "alternate", beforeId)` 可移動特效，個人布局寫入 `localStorage` key `rtx.fx.layout.v2`。layout 優先序為個人 `localStorage`、server 正規化 layout、v1／fallback 全 current；manifest reload 後會移除未知、停用或重複 effect IDs。
+
 ## 示範頁（examples，opt-in）
 
 `examples/` 預設停用。啟用後可瀏覽嵌入示範頁：
@@ -182,23 +185,12 @@ set SERVE_EXAMPLES=1 && python -m uvicorn server.main:app --port 8000
 
 ## 特效插件
 
-正式特效清單位於 `effects/effects.json`。目前正式 manifest 包含 15 個特效：
+正式特效清單位於 `effects/effects.json`。目前正式 manifest 為 `version: 2`，包含 15 個啟用特效；`currentEffects` 目前列出全部 15 個特效，`alternateEffects` 為空。個別特效可加 `enabled: false` 停用；停用時不進入 `GET /api/effects`、不被 viewer 載入、不被 `POST /api/effect` 接受，也不檢查該特效的 `viewer.js` 是否存在。
 
-- `particle`
-- `ripple`
-- `firework`
-- `text`
-- `slash`
-- `vortex`
-- `chrono-vortex`
-- `tear-slash`
-- `rocket`
-- `pixel-melt`
-- `hyper-warp`
-- `aurora`
-- `fire-dragon`
-- `orbital-strike`
-- `magic-circle`
+- `particle`、`ripple`、`firework`、`text`
+- `slash`、`vortex`、`chrono-vortex`、`tear-slash`
+- `rocket`、`pixel-melt`、`hyper-warp`
+- `aurora`、`fire-dragon`、`orbital-strike`、`magic-circle`
 
 每個特效至少需要：
 
@@ -220,8 +212,8 @@ API／E2E 自動測試預設使用 `tests/fixtures/effects.json`，只包含原�
 | 路由 | 用途 |
 | --- | --- |
 | `GET /health` | 健康檢查 |
-| `GET /api/effects` | 回傳 `rev` 與清洗後特效 manifest |
-| `POST /api/effects/reload` | 手動重載 manifest；變更時更新 catalog、廣播 SSE `manifest`，並回傳 `changed`、`rev` 與 effect id 清單 |
+| `GET /api/effects` | 回傳 `rev`、`version`、清洗後啟用特效 manifest，以及正規化後的 `currentEffects`／`alternateEffects` |
+| `POST /api/effects/reload` | 手動重載 manifest；變更時更新 catalog、廣播含 layout 的 SSE `manifest`，並回傳 `changed`、`rev` 與 effect id 清單 |
 | `POST /api/effect` | 送出特效事件 |
 | `POST /api/clear` | 清屏事件 |
 | `GET /api/stream` | viewer SSE 串流（effect / clear / ping / manifest） |

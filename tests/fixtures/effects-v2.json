@@ -1,0 +1,158 @@
+{
+  "version": 2,
+  "currentEffects": ["particle", "ripple"],
+  "alternateEffects": ["firework", "text"],
+  "effects": {
+    "particle": {
+      "label": "粒子爆散",
+      "category": "burst",
+      "icon": "particle",
+      "viewer": "viewer.js",
+      "console": "console.js",
+      "params": {
+        "color": {
+          "type": "color",
+          "label": "顏色",
+          "default": "#ff0044"
+        },
+        "count": {
+          "type": "integer",
+          "label": "數量",
+          "default": 40,
+          "min": 1,
+          "max": 400,
+          "step": 1
+        },
+        "spread": {
+          "type": "number",
+          "label": "散佈(度)",
+          "default": 360,
+          "min": 0,
+          "max": 360,
+          "step": 5
+        },
+        "speed": {
+          "type": "number",
+          "label": "速度",
+          "default": 0.35,
+          "min": 0.05,
+          "max": 2,
+          "step": 0.05
+        },
+        "duration": {
+          "type": "integer",
+          "label": "持續(ms)",
+          "default": 1200,
+          "min": 200,
+          "max": 8000,
+          "step": 100
+        }
+      }
+    },
+    "ripple": {
+      "label": "漣漪圈",
+      "category": "ripple",
+      "icon": "ripple",
+      "viewer": "viewer.js",
+      "console": "console.js",
+      "params": {
+        "color": {
+          "type": "color",
+          "label": "顏色",
+          "default": "#44aaff"
+        },
+        "maxRadius": {
+          "type": "number",
+          "label": "最大半徑",
+          "default": 200,
+          "min": 20,
+          "max": 600,
+          "step": 10
+        },
+        "duration": {
+          "type": "integer",
+          "label": "持續(ms)",
+          "default": 1200,
+          "min": 200,
+          "max": 8000,
+          "step": 100
+        }
+      }
+    },
+    "firework": {
+      "label": "煙火",
+      "category": "burst",
+      "icon": "firework",
+      "viewer": "viewer.js",
+      "params": {
+        "colors": {
+          "type": "array",
+          "items": "color",
+          "label": "顏色",
+          "default": ["#ff5252", "#ffd740", "#40c4ff", "#69f0ae"],
+          "minItems": 1,
+          "maxItems": 8,
+          "editable": false
+        },
+        "count": {
+          "type": "integer",
+          "label": "數量",
+          "default": 90,
+          "min": 1,
+          "max": 400,
+          "step": 1
+        },
+        "duration": {
+          "type": "integer",
+          "label": "持續(ms)",
+          "default": 1800,
+          "min": 200,
+          "max": 8000,
+          "step": 100
+        }
+      }
+    },
+    "text": {
+      "label": "浮現文字",
+      "category": "text",
+      "icon": "text",
+      "viewer": "viewer.js",
+      "console": "console.js",
+      "params": {
+        "content": {
+          "type": "string",
+          "label": "文字",
+          "default": "Hello",
+          "maxLength": 20
+        },
+        "color": {
+          "type": "color",
+          "label": "顏色",
+          "default": "#ffffff"
+        },
+        "size": {
+          "type": "integer",
+          "label": "字級",
+          "default": 32,
+          "min": 8,
+          "max": 160,
+          "step": 2
+        },
+        "duration": {
+          "type": "integer",
+          "label": "持續(ms)",
+          "default": 2000,
+          "min": 200,
+          "max": 10000,
+          "step": 100
+        }
+      }
+    },
+    "legacy": {
+      "label": "舊特效",
+      "enabled": false,
+      "viewer": "viewer.js",
+      "params": {}
+    }
+  }
+}

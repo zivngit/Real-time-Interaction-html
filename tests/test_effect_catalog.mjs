@@ -12,7 +12,7 @@ const EFFECT_ID_RE = /^[A-Za-z0-9_-]+$/;
 const PARAM_KEY_RE = /^[A-Za-z0-9_-]+$/;
 const PARAM_TYPES = new Set(["integer", "number", "string", "color", "boolean", "select", "array"]);
 const COLOR_RE = /^#(?:[0-9a-f]{6}|[0-9a-f]{8})$/i;
-const KNOWN_EFFECT_FIELDS = new Set(["label", "category", "icon", "viewer", "console", "params"]);
+const KNOWN_EFFECT_FIELDS = new Set(["label", "category", "icon", "viewer", "console", "params", "enabled"]);
 const KNOWN_PARAM_FIELDS = new Set([
   "type",
   "label",
@@ -297,13 +297,76 @@ function validateParam(effectId, key, spec, fail, warn) {
   }
 }
 
+function isEffectEnabled(spec) {
+  if (!isPlainObject(spec)) return false;
+  if (!("enabled" in spec)) return true;
+  return spec.enabled === true;
+}
+
+function validateLayout(manifest, effects, fail, warn) {
+  if (manifest.version === 1) {
+    if ("currentEffects" in manifest || "alternateEffects" in manifest) {
+      fail("manifest version 1 不應包含 currentEffects 或 alternateEffects");
+    }
+    return;
+  }
+
+  const rawCurrent = manifest.currentEffects;
+  const rawAlternate = manifest.alternateEffects;
+  if (!Array.isArray(rawCurrent)) {
+    fail("manifest version 2 必須有 currentEffects array");
+    return;
+  }
+  if (!Array.isArray(rawAlternate)) {
+    fail("manifest version 2 必須有 alternateEffects array");
+    return;
+  }
+  for (const effectId of rawCurrent) {
+    if (typeof effectId !== "string" || !EFFECT_ID_RE.test(effectId)) {
+      fail(`currentEffects 含有無效 effect id：${effectId}`);
+    } else if (!effects[effectId]) {
+      fail(`currentEffects 含有未登記 effect：${effectId}`);
+    } else if (!isEffectEnabled(effects[effectId])) {
+      fail(`currentEffects 含有 disabled effect：${effectId}`);
+    }
+  }
+  for (const effectId of rawAlternate) {
+    if (typeof effectId !== "string" || !EFFECT_ID_RE.test(effectId)) {
+      fail(`alternateEffects 含有無效 effect id：${effectId}`);
+    } else if (!effects[effectId]) {
+      fail(`alternateEffects 含有未登記 effect：${effectId}`);
+    } else if (!isEffectEnabled(effects[effectId])) {
+      fail(`alternateEffects 含有 disabled effect：${effectId}`);
+    }
+  }
+  if (new Set(rawCurrent).size !== rawCurrent.length) {
+    fail("currentEffects 含有重複 effect id");
+  }
+  if (new Set(rawAlternate).size !== rawAlternate.length) {
+    fail("alternateEffects 含有重複 effect id");
+  }
+  const currentSet = new Set(rawCurrent);
+  for (const effectId of rawAlternate) {
+    if (currentSet.has(effectId)) {
+      fail(`currentEffects 與 alternateEffects 重複：${effectId}`);
+    }
+  }
+
+  const placed = new Set([...rawCurrent, ...rawAlternate]);
+  for (const [effectId, spec] of Object.entries(effects)) {
+    if (isEffectEnabled(spec) && !placed.has(effectId)) {
+      warn(`${effectId}：enabled effect 未列入 currentEffects 或 alternateEffects，將自動放入 alternateEffects`);
+    }
+  }
+}
+
 function validateManifest(manifest, fail, warn) {
   if (!isPlainObject(manifest)) {
     fail("effects/effects.json 必須是 JSON object");
     return false;
   }
-  if (manifest.version !== 1) {
-    fail("effects/effects.json 的 version 必須是 1");
+  if (manifest.version !== 1 && manifest.version !== 2) {
+    fail("effects/effects.json 的 version 必須是 1 或 2");
   }
   const effects = manifest.effects;
   if (!isPlainObject(effects) || Object.keys(effects).length === 0) {
@@ -331,6 +394,9 @@ function validateManifest(manifest, fail, warn) {
     if ("icon" in spec && typeof spec.icon !== "string") {
       fail(`${effectId}：icon 必須是 string`);
     }
+    if ("enabled" in spec && typeof spec.enabled !== "boolean") {
+      fail(`${effectId}：enabled 必須是 boolean`);
+    }
     if ("viewer" in spec) {
       if (typeof spec.viewer !== "string" || spec.viewer !== "viewer.js") {
         fail(`${effectId}：viewer 必須是 viewer.js`);
@@ -348,6 +414,7 @@ function validateManifest(manifest, fail, warn) {
       }
     }
   }
+  validateLayout(manifest, effects, fail, warn);
   return true;
 }
 
@@ -759,7 +826,9 @@ test("特效 catalog 必須與 manifest、資料夾、viewer plugins 與 console
   if (manifest !== null && validateManifest(manifest, fail, warn)) {
     const manifestIds = Object.keys(manifest.effects);
     for (const id of manifestIds) {
-      if (!effectDirs.includes(id)) fail(`manifest effect ${id} 缺少 effects/${id}/`);
+      if (!effectDirs.includes(id) && isEffectEnabled(manifest.effects[id])) {
+        fail(`manifest effect ${id} 缺少 effects/${id}/`);
+      }
     }
     for (const dir of effectDirs) {
       if (!manifestIds.includes(dir)) fail(`effects/${dir}/ 存在但未登記於 effects.json`);

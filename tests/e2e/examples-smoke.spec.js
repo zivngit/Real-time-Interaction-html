@@ -16,16 +16,22 @@ test("embed-console loads console and test manifest effects", async ({ page }) =
   const errors = trackPageErrors(page);
   await openConsolePage(page);
   await expect(page.locator("#rtx-fab")).toBeVisible();
-  await expect(page.locator(".rtx-fx")).toHaveCount(TEST_EFFECTS.length);
+  await expect(page.locator("#rtx-fx-current .rtx-fx")).toHaveCount(TEST_EFFECTS.length);
   expect(errors).toHaveLength(0);
 });
 
 test("embed-console fx buttons use fixed grid layout", async ({ page }) => {
   const errors = trackPageErrors(page);
   await openConsolePage(page);
-  await expect(page.locator("#rtx-fx-buttons")).toBeVisible();
-  await expect(page.locator("#rtx-fx-buttons .rtx-fx")).toHaveCount(TEST_EFFECTS.length);
-  const grid = await page.locator("#rtx-fx-buttons").evaluate((el) => {
+  await expect(page.locator("#rtx-fx-current")).toBeVisible();
+  await expect(page.locator("#rtx-fx-current .rtx-fx")).toHaveCount(TEST_EFFECTS.length);
+  await expect(page.locator("#rtx-fx-alternate")).toBeHidden();
+  await expect
+    .poll(() =>
+      page.locator("#rtx-fx-current").evaluate((el) => getComputedStyle(el).display)
+    )
+    .toBe("grid");
+  const grid = await page.locator("#rtx-fx-current").evaluate((el) => {
     const cs = getComputedStyle(el);
     return {
       display: cs.display,
