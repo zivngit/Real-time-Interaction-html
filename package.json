@@ -10,7 +10,7 @@
   },
   "scripts": {
     "test": "npm run test:unit && npm run test:e2e",
-    "test:unit": "python -c \"import pytest, httpx, fastapi\" && python -m pytest tests/ -q && node --test tests/test_effects.mjs tests/test_console.mjs tests/test_effect_examples.mjs",
+    "test:unit": "python -c \"import pytest, httpx, fastapi\" && python -m pytest tests/ -q && node --test tests/test_effects.mjs tests/test_console.mjs tests/test_effect_examples.mjs tests/test_effect_catalog.mjs",
     "test:e2e": "playwright test"
   },
   "keywords": [],

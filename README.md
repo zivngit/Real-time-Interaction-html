@@ -60,8 +60,15 @@ project/
 │   ├── text/                # 浮現文字
 │   ├── slash/               # slash 特效
 │   ├── vortex/              # vortex 特效
+│   ├── chrono-vortex/       # chrono-vortex 特效
 │   ├── tear-slash/          # tear-slash 特效
-│   └── rocket/              # rocket 特效
+│   ├── rocket/              # rocket 特效
+│   ├── pixel-melt/          # pixel-melt 特效
+│   ├── hyper-warp/          # hyper-warp 特效
+│   ├── aurora/              # aurora 特效
+│   ├── fire-dragon/         # fire-dragon 特效
+│   ├── orbital-strike/      # orbital-strike 特效
+│   └── magic-circle/        # magic-circle 特效
 ├── viewer/                  # viewer 嵌入腳本
 │   ├── app.js               # SSE 接收、canvas 管理、特效引擎載入
 │   └── effects.js           # Effects registry、座標換算、render loop
@@ -83,6 +90,7 @@ project/
 │   ├── test_effects.mjs     # node：viewer 特效引擎
 │   ├── test_console.mjs     # node：console DOM 行為
 │   ├── test_effect_examples.mjs
+│   ├── test_effect_catalog.mjs
 │   ├── fixtures/effects.json # 測試用 manifest（固定原四特效）
 │   └── e2e/                 # Playwright 瀏覽器 E2E
 ├── docs/
@@ -174,7 +182,7 @@ set SERVE_EXAMPLES=1 && python -m uvicorn server.main:app --port 8000
 
 ## 特效插件
 
-正式特效清單位於 `effects/effects.json`。目前正式 manifest 包含 8 個特效：
+正式特效清單位於 `effects/effects.json`。目前正式 manifest 包含 15 個特效：
 
 - `particle`
 - `ripple`
@@ -182,13 +190,20 @@ set SERVE_EXAMPLES=1 && python -m uvicorn server.main:app --port 8000
 - `text`
 - `slash`
 - `vortex`
+- `chrono-vortex`
 - `tear-slash`
 - `rocket`
+- `pixel-melt`
+- `hyper-warp`
+- `aurora`
+- `fire-dragon`
+- `orbital-strike`
+- `magic-circle`
 
 每個特效至少需要：
 
 - `effects/<id>/viewer.js`：註冊 `window.Effects.register(id, factory)`
-- `effects/effects.json` 中的 manifest entry：宣告 `viewerUrl`、`params` schema、icon 等資訊
+- `effects/effects.json` 中的 manifest entry：宣告 `viewer`、`params` schema、icon 等資訊
 
 選配：
 
@@ -198,7 +213,7 @@ set SERVE_EXAMPLES=1 && python -m uvicorn server.main:app --port 8000
 
 新增特效請參考 `docs/HOW_TO_ADD_EFFECT.md`；完整範例在 `examples/effects/sample-burst/`，最小介面參考 `examples/effects/effect-interface/`。
 
-自動測試預設使用 `tests/fixtures/effects.json`，只包含原四特效：`particle`、`ripple`、`firework`、`text`。新特效加入正式 manifest 後，不會自動進入預設測試。
+API／E2E 自動測試預設使用 `tests/fixtures/effects.json`，只包含原四特效：`particle`、`ripple`、`firework`、`text`。新特效加入正式 manifest 後，不會自動進入 API／E2E 預設測試；`tests/test_effect_catalog.mjs` 會自動納入正式 catalog 檢查。
 
 ## API 概述
 
@@ -227,7 +242,7 @@ python -m pytest tests/ -q
 Node viewer／console 邏輯測試：
 
 ```bash
-node --test tests/test_effects.mjs tests/test_console.mjs tests/test_effect_examples.mjs
+node --test tests/test_effects.mjs tests/test_console.mjs tests/test_effect_examples.mjs tests/test_effect_catalog.mjs
 ```
 
 Playwright 瀏覽器 E2E：
@@ -243,7 +258,7 @@ npx playwright test
 npm run test
 ```
 
-目前測試數量：pytest 41 項、node 88 項（`test_console` 54、`test_effect_examples` 16、`test_effects` 18）、Playwright E2E 14 項。
+目前測試數量：pytest 41 項、node 89 項（`test_console` 54、`test_effect_examples` 16、`test_effects` 18、`test_effect_catalog` 1）、Playwright E2E 14 項。
 
 Playwright E2E 會自動啟動 server（port `8123`），並使用 `tests/fixtures/effects.json`，因此預設不會把新特效納入測試。`tests/e2e/reload-manifest.spec.js` 會另啟獨立 server 與 temp manifest，驗證 viewer 自動更新與 console 手動重載／重新整理。`tests/e2e/multi-console-reload.spec.js` 會另啟兩個獨立 server、temp manifest 與不同 `ACCESS_KEY`，驗證不同 server URL / key 的多 Console 端各自重載、被移除 effect 的 selected fallback，且互不影響。
 

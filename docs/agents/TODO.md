@@ -12,7 +12,7 @@
 
 - SSE 斷線期間特效遺失（規格：不重播）
 - 限頻為全域滑動視窗（未區分客戶端）
-- 前端（console/viewer）已有 Playwright 瀏覽器 E2E（`tests/e2e/`，10 項）；console 另有 node vm 冒煙測試（`tests/test_console.mjs`，52 項），viewer 另有 node vm 冒煙測試（`tests/test_effects.mjs`，18 項），特效範例另有 node vm 冒煙測試（`tests/test_effect_examples.mjs`，16 項）
+- 前端（console/viewer）已有 Playwright 瀏覽器 E2E（`tests/e2e/`，14 項）；console 另有 node vm 冒煙測試（`tests/test_console.mjs`，54 項），viewer 另有 node vm 冒煙測試（`tests/test_effects.mjs`，18 項），特效範例另有 node vm 冒煙測試（`tests/test_effect_examples.mjs`，16 項），正式 catalog 另有 node vm 驗證測試（`tests/test_effect_catalog.mjs`，1 項）
 
 ## 第一階段：建立可維護的執行基礎
 
@@ -59,6 +59,7 @@
 - [x] console 特效按鈕 1/8/20/50 可點擊測試：新增 node vm 測試與 Playwright E2E；`#rtx-fx-buttons` 增加 `max-height: 180px` 與 `overflow-y: auto`，確保 50 個特效按鈕可滾動並逐一點擊（2026-09-12）
 - [x] console 特效按鈕滑動條樣式：`#rtx-fx-buttons` 增加 themed scrollbar（`scrollbar-width`／`scrollbar-color` 與 WebKit scrollbar pseudo-elements），並更新 console vm 測試（2026-09-12）
 - [x] examples 淺色／深色主題切換：新增 `examples/theme.css`、`examples/theme.js`，四個 example HTML 加入右上角主題切換、`localStorage` 記憶與系統偏好 fallback；更新 API 測試、Playwright E2E、README 與 CALL_GRAPH（2026-09-12）
+- [x] effects catalog 自動檢測與正式特效擴充：新增 `tests/test_effect_catalog.mjs` 動態驗證正式 `effects/effects.json`、`effects/<id>/viewer.js`、選用 `console.js`、manifest/plugin 一致性、param schema、viewer smoke run、console render 與 icon/source warnings；納入 `chrono-vortex`、`pixel-melt`、`hyper-warp`、`aurora`、`fire-dragon`、`orbital-strike`、`magic-circle` 7 個正式特效；修正 `slash`／`tear-slash` 的 viewer defaults；`package.json test:unit` 納入新測試（2026-09-13）
 - [ ] 處理 pytest 的 2 個第三方 deprecation warnings：評估加入 `httpx2` 並限制 `anyio>=4.10,<4.15`（已用 temp dependencies 驗證可消除 warnings；2026-09-11 暫不處理）
 - [ ] server 斷線重播暫存（最近 N 則）
 - [ ] viewer 狀態回報（POST /api/status）

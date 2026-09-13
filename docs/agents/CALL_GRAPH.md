@@ -1,6 +1,6 @@
 # Real-time Interaction html 函式呼叫關係圖
 
-> 最後更新：2026-09-12
+> 最後更新：2026-09-13
 
 ## 1. 整體架構
 
@@ -280,7 +280,7 @@ classDiagram
     }
     Viewer ..> Effects : toPixels / createEffect / stepEffect
     EffectPlugin ..> Effects : register(type, factory)
-    Effects ..> Effect : 建立（particle / firework / ripple / text）
+    Effects ..> Effect : 依 manifest 動態建立 effects/*/viewer.js 特效
     Console ..> ConsolePlugin : 選用 render／iconID／iconSVG（缺失時 schema 渲染／manifest icon）
     Console ..> Server : POST /api/effect / POST /api/clear / POST /api/effects/reload
     Server ..> EffectCatalog : 讀取 EFFECTS / MANIFEST / MANIFEST_REV / MANIFEST_PATH；reload_effects()
@@ -303,9 +303,11 @@ flowchart LR
     TA["tests/test_api.py<br/>pytest＋TestClient（41）<br/>fixture manifest 與 temp reload manifest"] --> M["server/main.py<br/>＋server/config.py、security.py、params.py、relay.py、static_files.py、effects.py"]
     TA --> TF
     TE["tests/test_effects.mjs<br/>node --test＋vm（18）"] --> S["viewer/effects.js ＋ effects/*/viewer.js"]
-    TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（52）"] --> K["console/app.js ＋ effects/*/console.js"]
+    TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（54）"] --> K["console/app.js ＋ effects/*/console.js"]
     TX["tests/test_effect_examples.mjs<br/>node --test＋vm fake sandbox（16）"] --> X["examples/effects/*/effects.json ＋ viewer.js ＋ console.js"]
-    TP["tests/e2e/*.spec.js<br/>Playwright E2E（11）<br/>預設 webServer port 8123<br/>reload-manifest.spec.js 另啟獨立 server＋temp manifest<br/>multi-console-reload.spec.js 另啟兩個獨立 server／key＋selected fallback"] --> M
+    TG["tests/test_effect_catalog.mjs<br/>node --test＋vm（1）<br/>正式 effects/effects.json、effects/*/viewer.js、選用 console.js"] --> S
+    TG --> K
+    TP["tests/e2e/*.spec.js<br/>Playwright E2E（14）<br/>預設 webServer port 8123<br/>reload-manifest.spec.js 另啟獨立 server＋temp manifest<br/>multi-console-reload.spec.js 另啟兩個獨立 server／key＋selected fallback"] --> M
     TP --> K
     TP --> S
     TP --> TF
@@ -322,7 +324,7 @@ flowchart LR
 執行測試：
 
 ```
-python -m pytest tests/ -v
-node --test tests/test_effects.mjs tests/test_console.mjs tests/test_effect_examples.mjs
+python -m pytest tests/ -q
+node --test tests/test_effects.mjs tests/test_console.mjs tests/test_effect_examples.mjs tests/test_effect_catalog.mjs
 npx playwright test
 ```

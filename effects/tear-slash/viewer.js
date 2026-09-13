@@ -5,10 +5,10 @@
 
   var DEFAULTS = { 
     color: "#ffffff", 
-    length: 500, 
-    thickness: 35,
-    angle: 135, 
-    duration: 400 
+    length: 450,
+    thickness: 20,
+    angle: 135,
+    duration: 350
   };
 
   function merge(params) {
@@ -62,9 +62,9 @@
     }
 
     return {
-      update: function (dt) { t += dt; }, //[cite: 2]
-      done: function () { return t >= p.duration; }, //[cite: 2]
-      draw: function (ctx) { //[cite: 2]
+      update: function (dt) { t += dt; }, 
+      done: function () { return t >= p.duration; }, 
+      draw: function (ctx) { 
         var k = t / p.duration; 
         
         var tipProgress = Math.min(1, k * 5); 

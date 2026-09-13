@@ -7,7 +7,7 @@
     color: "#ffffff", 
     length: 300, 
     thickness: 12, 
-    angle: 135, 
+    angle: 45, 
     duration: 400 
   };
 

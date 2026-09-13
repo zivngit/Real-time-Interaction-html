@@ -230,6 +230,66 @@
         }
       }
     },
+    "chrono-vortex": {
+      "label": "時空漩渦",
+      "category": "warp",
+      "viewer": "viewer.js",
+      "console": "console.js",
+      "params": {
+        "coreColor": {
+          "type": "color",
+          "label": "核心黑洞色",
+          "default": "#111111"
+        },
+        "ringColor": {
+          "type": "color",
+          "label": "白環顏色",
+          "default": "#ffffff"
+        },
+        "glitchColor1": {
+          "type": "color",
+          "label": "失真色 A",
+          "default": "#00ff88"
+        },
+        "glitchColor2": {
+          "type": "color",
+          "label": "失真色 B",
+          "default": "#ff44ff"
+        },
+        "maxRadius": {
+          "type": "number",
+          "label": "最大半徑",
+          "default": 350,
+          "min": 100,
+          "max": 800,
+          "step": 10
+        },
+        "streakCount": {
+          "type": "integer",
+          "label": "光線數量",
+          "default": 24,
+          "min": 0,
+          "max": 60,
+          "step": 4
+        },
+        "flash": {
+          "type": "number",
+          "label": "白熲強度",
+          "default": 0.95,
+          "min": 0,
+          "max": 1,
+          "step": 0.05
+        },
+        "duration": {
+          "type": "integer",
+          "label": "持續時間 (ms)",
+          "default": 2200,
+          "min": 800,
+          "max": 6000,
+          "step": 100
+        }
+      }
+    },
     "tear-slash": {
       "label": "撕裂斬擊",
       "category": "action",
@@ -275,7 +335,7 @@
           }
         }
     },
-      "rocket": {
+    "rocket": {
         "label": "小火箭升空",
         "category": "fun",
         "viewer": "viewer.js",
@@ -308,6 +368,260 @@
             "step": 100
         }
       }
+    },
+    "pixel-melt": {
+        "label": "像素崩塌",
+        "category": "glitch",
+        "viewer": "viewer.js",
+        "console": "console.js",
+        "params": {
+          "color": {
+            "type": "color",
+            "label": "像素色",
+            "default": "#40c4ff"
+          },
+          "blockSize": {
+            "type": "integer",
+            "label": "像素塊大小",
+            "default": 16,
+            "min": 6,
+            "max": 48,
+            "step": 2
+          },
+          "radius": {
+            "type": "number",
+            "label": "崩塌半徑",
+            "default": 240,
+            "min": 60,
+            "max": 500,
+            "step": 10
+          },
+          "gravity": {
+            "type": "number",
+            "label": "重力倍率",
+            "default": 1.2,
+            "min": 0,
+            "max": 3,
+            "step": 0.1
+          },
+          "duration": {
+            "type": "integer",
+            "label": "持續時間 (ms)",
+            "default": 1800,
+            "min": 500,
+            "max": 5000,
+            "step": 100
+          }
+        }
+    },
+    "hyper-warp": {
+      "label": "星際超空間",
+      "category": "warp",
+      "viewer": "viewer.js",
+      "console": "console.js",
+      "params": {
+        "color": {
+          "type": "color",
+          "label": "光軌顏色",
+          "default": "#9fd8ff"
+        },
+        "count": {
+          "type": "integer",
+          "label": "星光數量",
+          "default": 240,
+          "min": 20,
+          "max": 600,
+          "step": 10
+        },
+        "speed": {
+          "type": "number",
+          "label": "曲速倍率",
+          "default": 1.5,
+          "min": 0.3,
+          "max": 5,
+          "step": 0.1
+        },
+        "duration": {
+          "type": "integer",
+          "label": "持續時間 (ms)",
+          "default": 2000,
+          "min": 600,
+          "max": 5000,
+          "step": 100
+        }
+      }
+    },
+    "aurora": {
+      "label": "極光光幕",
+      "category": "ambient",
+      "viewer": "viewer.js",
+      "console": "console.js",
+      "params": {
+        "color": {
+          "type": "color",
+          "label": "光幕主色",
+          "default": "#59ffb0"
+        },
+        "color2": {
+          "type": "color",
+          "label": "頂部暈色",
+          "default": "#b459ff"
+        },
+        "bandWidth": {
+          "type": "number",
+          "label": "光幕寬度",
+          "default": 480,
+          "min": 120,
+          "max": 1200,
+          "step": 20
+        },
+        "height": {
+          "type": "number",
+          "label": "光幕高度",
+          "default": 260,
+          "min": 80,
+          "max": 600,
+          "step": 10
+        },
+        "shimmer": {
+          "type": "number",
+          "label": "波盪強度",
+          "default": 1,
+          "min": 0,
+          "max": 2,
+          "step": 0.1
+        },
+        "duration": {
+          "type": "integer",
+          "label": "持續時間 (ms)",
+          "default": 5000,
+          "min": 1500,
+          "max": 15000,
+          "step": 250
+        }
+      }
+    },
+    "fire-dragon": {
+      "label": "焰龍追跡",
+      "category": "creature",
+      "viewer": "viewer.js",
+      "console": "console.js",
+      "params": {
+        "color": {
+          "type": "color",
+          "label": "火焰色",
+          "default": "#ff6a1f"
+        },
+        "size": {
+          "type": "number",
+          "label": "龍身粗細",
+          "default": 1,
+          "min": 0.5,
+          "max": 2.5,
+          "step": 0.1
+        },
+        "speed": {
+          "type": "number",
+          "label": "飛行速度",
+          "default": 1,
+          "min": 0.4,
+          "max": 2.5,
+          "step": 0.1
+        },
+        "sparks": {
+          "type": "integer",
+          "label": "火星數量",
+          "default": 60,
+          "min": 0,
+          "max": 200,
+          "step": 5
+        },
+        "duration": {
+          "type": "integer",
+          "label": "持續時間 (ms)",
+          "default": 4000,
+          "min": 1500,
+          "max": 8000,
+          "step": 100
+        }
+      }
+    },
+    "orbital-strike": {
+      "label": "軌道雷射砲",
+      "category": "action",
+      "viewer": "viewer.js",
+      "console": "console.js",
+      "params": {
+        "coreColor": {
+          "type": "color",
+          "label": "核心高光色",
+          "default": "#ffffff"
+        },
+        "beamColor": {
+          "type": "color",
+          "label": "外圍光束色",
+          "default": "#00d4ff"
+        },
+        "radius": {
+          "type": "number",
+          "label": "衝擊波半徑",
+          "default": 250,
+          "min": 50,
+          "max": 600,
+          "step": 10
+        },
+        "duration": {
+          "type": "integer",
+          "label": "持續時間 (ms)",
+          "default": 850,
+          "min": 300,
+          "max": 2000,
+          "step": 50
+        }
+      }
+    },
+    "magic-circle": {
+      "label": "幾何魔法陣",
+      "category": "magic",
+      "viewer": "viewer.js",
+      "console": "console.js",
+      "params": {
+        "color1": {
+          "type": "color",
+          "label": "主色調",
+          "default": "#ffaa00"
+        },
+        "color2": {
+          "type": "color",
+          "label": "輔助色",
+          "default": "#ffffff"
+        },
+        "ringColors": {
+          "type": "array",
+          "label": "光環漸層色",
+          "items": "color",
+          "default": ["#ffaa00", "#ffeedd", "#ffffff"],
+          "editable": false
+        },
+        "radius": {
+          "type": "number",
+          "label": "陣法半徑",
+          "default": 200,
+          "min": 50,
+          "max": 500,
+          "step": 10
+        },
+        "duration": {
+          "type": "integer",
+          "label": "持續時間 (ms)",
+          "default": 3000,
+          "min": 1000,
+          "max": 8000,
+          "step": 100
+        }
+      }
     }
+
+
   }
 }
