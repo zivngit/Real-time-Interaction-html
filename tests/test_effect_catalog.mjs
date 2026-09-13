@@ -155,43 +155,43 @@ function editableFieldsFromManifest(entry) {
 
 function validateParam(effectId, key, spec, fail, warn) {
   if (!PARAM_KEY_RE.test(key)) {
-    fail(`${effectId}: param key ${key} must match ${PARAM_KEY_RE}`);
+    fail(`${effectId}：param key ${key} 必須符合 ${PARAM_KEY_RE}`);
     return;
   }
   if (!isPlainObject(spec)) {
-    fail(`${effectId}: param ${key} must be an object`);
+    fail(`${effectId}：param ${key} 必須是 object`);
     return;
   }
   for (const field of Object.keys(spec)) {
-    if (!KNOWN_PARAM_FIELDS.has(field)) warn(`${effectId}: param ${key} has unknown field ${field}`);
+    if (!KNOWN_PARAM_FIELDS.has(field)) warn(`${effectId}：param ${key} 有未知欄位 ${field}`);
   }
   if (!PARAM_TYPES.has(spec.type)) {
-    fail(`${effectId}: param ${key} has unsupported type ${spec.type}`);
+    fail(`${effectId}：param ${key} 有不支援的 type：${spec.type}`);
     return;
   }
   if (!("default" in spec)) {
-    fail(`${effectId}: param ${key} missing default`);
+    fail(`${effectId}：param ${key} 缺少 default`);
     return;
   }
   if ("editable" in spec && typeof spec.editable !== "boolean") {
-    fail(`${effectId}: param ${key} editable must be boolean`);
+    fail(`${effectId}：param ${key} 的 editable 必須是 boolean`);
   }
 
   if (spec.type === "integer" || spec.type === "number") {
     if (typeof spec.default !== "number" || !Number.isFinite(spec.default)) {
-      fail(`${effectId}: param ${key} default must be a finite number`);
+      fail(`${effectId}：param ${key} 的 default 必須是有限數字`);
     } else {
       if (spec.type === "integer" && !Number.isInteger(spec.default)) {
-        fail(`${effectId}: param ${key} default must be an integer`);
+        fail(`${effectId}：param ${key} 的 default 必須是整數`);
       }
       if ("min" in spec && (typeof spec.min !== "number" || !Number.isFinite(spec.min) || spec.default < spec.min)) {
-        fail(`${effectId}: param ${key} default is below min`);
+        fail(`${effectId}：param ${key} 的 default 低於 min`);
       }
       if ("max" in spec && (typeof spec.max !== "number" || !Number.isFinite(spec.max) || spec.default > spec.max)) {
-        fail(`${effectId}: param ${key} default is above max`);
+        fail(`${effectId}：param ${key} 的 default 高於 max`);
       }
       if ("step" in spec && (typeof spec.step !== "number" || !Number.isFinite(spec.step) || spec.step <= 0)) {
-        fail(`${effectId}: param ${key} step must be a positive number`);
+        fail(`${effectId}：param ${key} 的 step 必須是正數`);
       }
       if (
         "min" in spec &&
@@ -200,148 +200,148 @@ function validateParam(effectId, key, spec, fail, warn) {
         typeof spec.max === "number" &&
         spec.min > spec.max
       ) {
-        fail(`${effectId}: param ${key} min must be less than or equal to max`);
+        fail(`${effectId}：param ${key} 的 min 必須小於等於 max`);
       }
     }
   }
 
   if (spec.type === "string") {
     if (typeof spec.default !== "string") {
-      fail(`${effectId}: param ${key} default must be a string`);
+      fail(`${effectId}：param ${key} 的 default 必須是 string`);
     } else if ("maxLength" in spec) {
       if (!Number.isInteger(spec.maxLength) || spec.maxLength <= 0) {
-        fail(`${effectId}: param ${key} maxLength must be a positive integer`);
+        fail(`${effectId}：param ${key} 的 maxLength 必須是正整數`);
       } else if (spec.default.length > spec.maxLength) {
-        fail(`${effectId}: param ${key} default exceeds maxLength`);
+        fail(`${effectId}：param ${key} 的 default 超過 maxLength`);
       }
     }
   }
 
   if (spec.type === "color") {
     if (typeof spec.default !== "string" || !COLOR_RE.test(spec.default)) {
-      fail(`${effectId}: param ${key} default must be #rrggbb or #rrggbbaa`);
+      fail(`${effectId}：param ${key} 的 default 必須是 #rrggbb 或 #rrggbbaa`);
     }
   }
 
   if (spec.type === "boolean") {
     if (typeof spec.default !== "boolean") {
-      fail(`${effectId}: param ${key} default must be boolean`);
+      fail(`${effectId}：param ${key} 的 default 必須是 boolean`);
     }
   }
 
   if (spec.type === "select") {
     if (!Array.isArray(spec.options) || spec.options.length === 0) {
-      fail(`${effectId}: param ${key} select requires options`);
+      fail(`${effectId}：param ${key} 的 select 需要 options`);
     } else {
       const values = new Set();
       for (const option of spec.options) {
         if (!isPlainObject(option) || !("value" in option)) {
-          fail(`${effectId}: param ${key} option must be an object with value`);
+          fail(`${effectId}：param ${key} 的 option 必須是含 value 的 object`);
           continue;
         }
         if (values.has(option.value)) {
-          fail(`${effectId}: param ${key} option value ${option.value} is duplicated`);
+          fail(`${effectId}：param ${key} 的 option value ${option.value} 重複`);
         }
         values.add(option.value);
       }
       if (!values.has(spec.default)) {
-        fail(`${effectId}: param ${key} default must be one of select options`);
+        fail(`${effectId}：param ${key} 的 default 必須是 select options 之一`);
       }
     }
   }
 
   if (spec.type === "array") {
     if (!Array.isArray(spec.default)) {
-      fail(`${effectId}: param ${key} default must be an array`);
+      fail(`${effectId}：param ${key} 的 default 必須是陣列`);
     } else {
       if ("items" in spec) {
         if (!PARAM_TYPES.has(spec.items)) {
-          fail(`${effectId}: param ${key} items must be a supported param type`);
+          fail(`${effectId}：param ${key} 的 items 必須是支援的 param 型別`);
         } else {
           for (const item of spec.default) {
             if (spec.items === "color" && (typeof item !== "string" || !COLOR_RE.test(item))) {
-              fail(`${effectId}: param ${key} contains invalid color item`);
+              fail(`${effectId}：param ${key} 含有無效 color 元素`);
             }
             if (spec.items === "integer" && !Number.isInteger(item)) {
-              fail(`${effectId}: param ${key} contains invalid integer item`);
+              fail(`${effectId}：param ${key} 含有無效 integer 元素`);
             }
             if (spec.items === "number" && (typeof item !== "number" || !Number.isFinite(item))) {
-              fail(`${effectId}: param ${key} contains invalid number item`);
+              fail(`${effectId}：param ${key} 含有無效 number 元素`);
             }
             if (spec.items === "string" && typeof item !== "string") {
-              fail(`${effectId}: param ${key} contains invalid string item`);
+              fail(`${effectId}：param ${key} 含有無效 string 元素`);
             }
             if (spec.items === "boolean" && typeof item !== "boolean") {
-              fail(`${effectId}: param ${key} contains invalid boolean item`);
+              fail(`${effectId}：param ${key} 含有無效 boolean 元素`);
             }
           }
         }
       }
       if ("minItems" in spec && (!Number.isInteger(spec.minItems) || spec.minItems < 0)) {
-        fail(`${effectId}: param ${key} minItems must be a non-negative integer`);
+        fail(`${effectId}：param ${key} 的 minItems 必須是非負整數`);
       }
       if ("maxItems" in spec && (!Number.isInteger(spec.maxItems) || spec.maxItems < 0)) {
-        fail(`${effectId}: param ${key} maxItems must be a non-negative integer`);
+        fail(`${effectId}：param ${key} 的 maxItems 必須是非負整數`);
       }
       if ("minItems" in spec && "maxItems" in spec && spec.minItems > spec.maxItems) {
-        fail(`${effectId}: param ${key} minItems must be less than or equal to maxItems`);
+        fail(`${effectId}：param ${key} 的 minItems 必須小於等於 maxItems`);
       }
       if ("minItems" in spec && spec.default.length < spec.minItems) {
-        fail(`${effectId}: param ${key} default length is below minItems`);
+        fail(`${effectId}：param ${key} 的 default 長度低於 minItems`);
       }
       if ("maxItems" in spec && spec.default.length > spec.maxItems) {
-        fail(`${effectId}: param ${key} default length is above maxItems`);
+        fail(`${effectId}：param ${key} 的 default 長度高於 maxItems`);
       }
     }
-    if (spec.editable === true) warn(`${effectId}: param ${key} is an editable array param`);
+    if (spec.editable === true) warn(`${effectId}：param ${key} 是可編輯 array param`);
   }
 }
 
 function validateManifest(manifest, fail, warn) {
   if (!isPlainObject(manifest)) {
-    fail("effects.json must be a JSON object");
+    fail("effects/effects.json 必須是 JSON object");
     return false;
   }
   if (manifest.version !== 1) {
-    fail("effects.json version must be 1");
+    fail("effects/effects.json 的 version 必須是 1");
   }
   const effects = manifest.effects;
   if (!isPlainObject(effects) || Object.keys(effects).length === 0) {
-    fail("effects.json must have a non-empty effects object");
+    fail("effects/effects.json 必須有非空 effects object");
     return false;
   }
   for (const [effectId, spec] of Object.entries(effects)) {
     if (!EFFECT_ID_RE.test(effectId)) {
-      fail(`invalid effect id: ${effectId}`);
+      fail(`無效 effect id：${effectId}`);
       continue;
     }
     if (!isPlainObject(spec)) {
-      fail(`${effectId}: effect entry must be an object`);
+      fail(`${effectId}：effect entry 必須是 object`);
       continue;
     }
     for (const field of Object.keys(spec)) {
-      if (!KNOWN_EFFECT_FIELDS.has(field)) warn(`${effectId}: unknown effect field ${field}`);
+      if (!KNOWN_EFFECT_FIELDS.has(field)) warn(`${effectId}：未知 effect 欄位 ${field}`);
     }
     if ("label" in spec && (typeof spec.label !== "string" || spec.label.length === 0)) {
-      fail(`${effectId}: label must be a non-empty string`);
+      fail(`${effectId}：label 必須是非空 string`);
     }
     if ("category" in spec && typeof spec.category !== "string") {
-      fail(`${effectId}: category must be a string`);
+      fail(`${effectId}：category 必須是 string`);
     }
     if ("icon" in spec && typeof spec.icon !== "string") {
-      fail(`${effectId}: icon must be a string`);
+      fail(`${effectId}：icon 必須是 string`);
     }
     if ("viewer" in spec) {
       if (typeof spec.viewer !== "string" || spec.viewer !== "viewer.js") {
-        fail(`${effectId}: viewer must be viewer.js`);
+        fail(`${effectId}：viewer 必須是 viewer.js`);
       }
     }
     if ("console" in spec && (typeof spec.console !== "string" || spec.console !== "console.js")) {
-      fail(`${effectId}: console must be console.js`);
+      fail(`${effectId}：console 必須是 console.js`);
     }
     const params = "params" in spec ? spec.params : {};
     if (!isPlainObject(params)) {
-      fail(`${effectId}: params must be an object`);
+      fail(`${effectId}：params 必須是 object`);
     } else {
       for (const [key, paramSpec] of Object.entries(params)) {
         validateParam(effectId, key, paramSpec, fail, warn);
@@ -459,37 +459,37 @@ function makeConsoleApi(effectId, entry, dom) {
 function sourceWarnings(file, source, fail, warn) {
   const has = (re) => re.test(source);
   if (file.endsWith("viewer.js")) {
-    if (has(/\bimport\b/)) warn(`${file}: uses import`);
-    if (has(/\bexport\b/)) warn(`${file}: uses export`);
-    if (has(/\brequire\s*\(/)) warn(`${file}: uses require`);
-    if (has(/\bdocument\b/)) warn(`${file}: uses document`);
+    if (has(/\bimport\b/)) warn(`${file}：使用 import`);
+    if (has(/\bexport\b/)) warn(`${file}：使用 export`);
+    if (has(/\brequire\s*\(/)) warn(`${file}：使用 require`);
+    if (has(/\bdocument\b/)) warn(`${file}：使用 document`);
   } else {
-    if (has(/\bimport\b/)) warn(`${file}: uses import`);
-    if (has(/\bexport\b/)) warn(`${file}: uses export`);
-    if (has(/\brequire\s*\(/)) warn(`${file}: uses require`);
+    if (has(/\bimport\b/)) warn(`${file}：使用 import`);
+    if (has(/\bexport\b/)) warn(`${file}：使用 export`);
+    if (has(/\brequire\s*\(/)) warn(`${file}：使用 require`);
   }
-  if (has(/\bfetch\s*\(/)) warn(`${file}: uses fetch`);
-  if (has(/XMLHttpRequest/)) warn(`${file}: uses XMLHttpRequest`);
-  if (has(/\bWebSocket\b/)) warn(`${file}: uses WebSocket`);
+  if (has(/\bfetch\s*\(/)) warn(`${file}：使用 fetch`);
+  if (has(/XMLHttpRequest/)) warn(`${file}：使用 XMLHttpRequest`);
+  if (has(/\bWebSocket\b/)) warn(`${file}：使用 WebSocket`);
 }
 
 function compareDefaultObject(effectId, label, extracted, entry, fail, warn) {
   if (extracted === null) {
-    warn(`${effectId}: ${label} defaults could not be statically confirmed`);
+    warn(`${effectId}：${label} defaults 無法靜態確認`);
     return;
   }
   if (!isPlainObject(extracted)) {
-    warn(`${effectId}: ${label} defaults are not a plain object`);
+    warn(`${effectId}：${label} defaults 不是 plain object`);
     return;
   }
   const params = isPlainObject(entry.params) ? entry.params : {};
   for (const [key, value] of Object.entries(extracted)) {
     if (!(key in params)) {
-      warn(`${effectId}: ${label} default ${key} is not present in manifest params`);
+      warn(`${effectId}：${label} default ${key} 不存在於 manifest params`);
       continue;
     }
     if (!deepEqual(value, params[key].default)) {
-      fail(`${effectId}: ${label} default for ${key} does not match manifest default`);
+      fail(`${effectId}：${label} default ${key} 與 manifest default 不一致`);
     }
   }
 }
@@ -500,7 +500,7 @@ function validateViewerPlugin(effectId, source, entry, fail, warn) {
   try {
     script = new vm.Script(source);
   } catch (error) {
-    fail(`${effectId}: viewer.js syntax error: ${error.message}`);
+    fail(`${effectId}：viewer.js 語法錯誤：${error.message}`);
     return;
   }
 
@@ -508,9 +508,9 @@ function validateViewerPlugin(effectId, source, entry, fail, warn) {
     const sandbox = { window: {}, console };
     vm.createContext(sandbox);
     script.runInContext(sandbox);
-    if (sandbox.window.Effects) fail(`${effectId}: viewer.js should not register when window.Effects is missing`);
+    if (sandbox.window.Effects) fail(`${effectId}：viewer.js 在缺少 window.Effects 時不應註冊`);
   } catch (error) {
-    fail(`${effectId}: viewer.js threw in no-registry sandbox: ${error.message}`);
+    fail(`${effectId}：viewer.js 在無 registry sandbox 中發生錯誤：${error.message}`);
     return;
   }
 
@@ -527,20 +527,20 @@ function validateViewerPlugin(effectId, source, entry, fail, warn) {
   try {
     script.runInContext(sandbox);
   } catch (error) {
-    fail(`${effectId}: viewer.js threw in registry sandbox: ${error.message}`);
+    fail(`${effectId}：viewer.js 在 registry sandbox 中發生錯誤：${error.message}`);
     return;
   }
 
   if (registrations.length !== 1) {
-    fail(`${effectId}: viewer.js must call window.Effects.register exactly once`);
+    fail(`${effectId}：viewer.js 必須恰好呼叫一次 window.Effects.register`);
     return;
   }
   const { id, factory } = registrations[0];
   if (id !== effectId) {
-    fail(`${effectId}: viewer.js registered id ${id}, expected ${effectId}`);
+    fail(`${effectId}：viewer.js 註冊 id 為 ${id}，應為 ${effectId}`);
   }
   if (typeof factory !== "function") {
-    fail(`${effectId}: viewer.js factory must be a function`);
+    fail(`${effectId}：viewer.js factory 必須是 function`);
     return;
   }
 
@@ -548,16 +548,16 @@ function validateViewerPlugin(effectId, source, entry, fail, warn) {
   try {
     effect = factory(0, 0, defaultsFromManifest(entry));
   } catch (error) {
-    fail(`${effectId}: viewer.js factory threw: ${error.message}`);
+    fail(`${effectId}：viewer.js factory 發生錯誤：${error.message}`);
     return;
   }
   if (!isPlainObject(effect)) {
-    fail(`${effectId}: viewer.js factory must return an object`);
+    fail(`${effectId}：viewer.js factory 必須回傳 object`);
     return;
   }
   for (const fn of ["update", "draw", "done"]) {
     if (typeof effect[fn] !== "function") {
-      fail(`${effectId}: viewer.js factory result missing ${fn} function`);
+      fail(`${effectId}：viewer.js factory 回傳值缺少 ${fn} function`);
     }
   }
   if (typeof effect.update !== "function" || typeof effect.draw !== "function" || typeof effect.done !== "function") {
@@ -573,9 +573,9 @@ function validateViewerPlugin(effectId, source, entry, fail, warn) {
       effect.draw(ctx);
       guard += 1;
     }
-    if (!effect.done()) fail(`${effectId}: viewer.js smoke run did not finish after 10000 steps`);
+    if (!effect.done()) fail(`${effectId}：viewer.js smoke run 在 10000 步後仍未完成`);
   } catch (error) {
-    fail(`${effectId}: viewer.js smoke run threw: ${error.message}`);
+    fail(`${effectId}：viewer.js smoke run 發生錯誤：${error.message}`);
   }
 
   compareDefaultObject(effectId, "viewer", extractDefaultObject(source), entry, fail, warn);
@@ -587,7 +587,7 @@ function validateConsolePlugin(effectId, source, entry, icons, fail, warn) {
   try {
     script = new vm.Script(source);
   } catch (error) {
-    fail(`${effectId}: console.js syntax error: ${error.message}`);
+    fail(`${effectId}：console.js 語法錯誤：${error.message}`);
     return;
   }
 
@@ -597,10 +597,10 @@ function validateConsolePlugin(effectId, source, entry, icons, fail, warn) {
     vm.createContext(sandbox);
     script.runInContext(sandbox);
     if (sandbox.window.RTX_EFFECT_CONSOLE) {
-      fail(`${effectId}: console.js should not register when window.RTX_EFFECT_CONSOLE is missing`);
+      fail(`${effectId}：console.js 在缺少 window.RTX_EFFECT_CONSOLE 時不應註冊`);
     }
   } catch (error) {
-    fail(`${effectId}: console.js threw in no-registry sandbox: ${error.message}`);
+    fail(`${effectId}：console.js 在無 registry sandbox 中發生錯誤：${error.message}`);
     return;
   }
 
@@ -618,54 +618,54 @@ function validateConsolePlugin(effectId, source, entry, icons, fail, warn) {
   try {
     script.runInContext(sandbox);
   } catch (error) {
-    fail(`${effectId}: console.js threw in registry sandbox: ${error.message}`);
+    fail(`${effectId}：console.js 在 registry sandbox 中發生錯誤：${error.message}`);
     return;
   }
 
   if (registrations.length !== 1) {
-    fail(`${effectId}: console.js must call window.RTX_EFFECT_CONSOLE.register exactly once`);
+    fail(`${effectId}：console.js 必須恰好呼叫一次 window.RTX_EFFECT_CONSOLE.register`);
     return;
   }
   const { id, plugin } = registrations[0];
   if (id !== effectId) {
-    fail(`${effectId}: console.js registered id ${id}, expected ${effectId}`);
+    fail(`${effectId}：console.js 註冊 id 為 ${id}，應為 ${effectId}`);
   }
   if (!isPlainObject(plugin)) {
-    fail(`${effectId}: console.js plugin must be an object`);
+    fail(`${effectId}：console.js plugin 必須是 object`);
     return;
   }
   if (typeof plugin.render !== "function") {
-    fail(`${effectId}: console.js plugin missing render function`);
+    fail(`${effectId}：console.js plugin 缺少 render function`);
     return;
   }
 
   if ("iconID" in plugin) {
     if (typeof plugin.iconID !== "string" || !Object.prototype.hasOwnProperty.call(icons, plugin.iconID)) {
-      warn(`${effectId}: console.js iconID is not a valid RTX_EFFECT_ICONS key`);
+      warn(`${effectId}：console.js iconID 不是有效的 RTX_EFFECT_ICONS key`);
     }
   }
   if ("iconSVG" in plugin) {
     if (typeof plugin.iconSVG !== "string") {
-      warn(`${effectId}: console.js iconSVG must be a string`);
+      warn(`${effectId}：console.js iconSVG 必須是 string`);
     } else {
       const isSvg = /^\s*<svg[\s>]/.test(plugin.iconSVG) && /<\/svg>\s*$/i.test(plugin.iconSVG);
       if (!isSvg) {
-        warn(`${effectId}: console.js iconSVG does not match isSvgString rules`);
+        warn(`${effectId}：console.js iconSVG 不符合 isSvgString 規則`);
       } else {
-        if (!/viewBox/i.test(plugin.iconSVG)) warn(`${effectId}: console.js iconSVG missing viewBox`);
-        if (!/aria-hidden/i.test(plugin.iconSVG)) warn(`${effectId}: console.js iconSVG missing aria-hidden`);
+        if (!/viewBox/i.test(plugin.iconSVG)) warn(`${effectId}：console.js iconSVG 缺少 viewBox`);
+        if (!/aria-hidden/i.test(plugin.iconSVG)) warn(`${effectId}：console.js iconSVG 缺少 aria-hidden`);
       }
     }
   }
   if ("icon" in entry && typeof entry.icon === "string" && !Object.prototype.hasOwnProperty.call(icons, entry.icon)) {
-    warn(`${effectId}: manifest icon ${entry.icon} is not a valid RTX_EFFECT_ICONS key`);
+    warn(`${effectId}：manifest icon ${entry.icon} 不是有效的 RTX_EFFECT_ICONS key`);
   }
 
   const api = makeConsoleApi(effectId, entry, dom);
   try {
     plugin.render(dom.root, api);
   } catch (error) {
-    fail(`${effectId}: console.js render threw: ${error.message}`);
+    fail(`${effectId}：console.js render 發生錯誤：${error.message}`);
     return;
   }
 
@@ -674,51 +674,51 @@ function validateConsolePlugin(effectId, source, entry, icons, fail, warn) {
   for (const field of fields) {
     const el = dom.document.getElementById(`rtx-p-${field.key}`);
     if (!el) {
-      fail(`${effectId}: console.js render missing rtx-p-${field.key}`);
+      fail(`${effectId}：console.js render 缺少 rtx-p-${field.key}`);
       continue;
     }
 
     if (field.type === "select") {
       if (el.tagName !== "SELECT") {
-        fail(`${effectId}: console.js rtx-p-${field.key} should be a select`);
+        fail(`${effectId}：console.js rtx-p-${field.key} 應是 select`);
       } else {
         const optionValues = el.children.filter((child) => child.tagName === "OPTION").map((child) => child.value);
         for (const option of field.options || []) {
           if (!optionValues.includes(option.value)) {
-            fail(`${effectId}: console.js rtx-p-${field.key} missing option ${option.value}`);
+            fail(`${effectId}：console.js rtx-p-${field.key} 缺少 option ${option.value}`);
           }
         }
       }
     } else if (field.type === "boolean") {
       if (el.tagName !== "INPUT" || el.type !== "checkbox") {
-        fail(`${effectId}: console.js rtx-p-${field.key} should be a checkbox`);
+        fail(`${effectId}：console.js rtx-p-${field.key} 應是 checkbox`);
       }
     } else if (field.type === "color") {
       if (el.tagName !== "INPUT" || el.type !== "color") {
-        fail(`${effectId}: console.js rtx-p-${field.key} should be a color input`);
+        fail(`${effectId}：console.js rtx-p-${field.key} 應是 color input`);
       }
     } else if (field.type === "integer" || field.type === "number") {
       if (el.tagName !== "INPUT" || el.type !== "number") {
-        fail(`${effectId}: console.js rtx-p-${field.key} should be a number input`);
+        fail(`${effectId}：console.js rtx-p-${field.key} 應是 number input`);
       }
     } else if (field.type === "string") {
       if (el.tagName !== "INPUT" || (el.type !== "text" && el.type !== "" && el.type !== undefined)) {
-        fail(`${effectId}: console.js rtx-p-${field.key} should be a text input`);
+        fail(`${effectId}：console.js rtx-p-${field.key} 應是 text input`);
       }
     }
 
     if (field.type === "boolean") {
       if (el.checked !== field.def) {
-        fail(`${effectId}: console.js rtx-p-${field.key} initial checked does not match manifest default`);
+        fail(`${effectId}：console.js rtx-p-${field.key} 初始 checked 與 manifest default 不一致`);
       }
     } else if (field.type === "integer" || field.type === "number") {
       const text = String(el.value ?? "");
       if (text.trim() === "" || Number(text) !== field.def) {
-        fail(`${effectId}: console.js rtx-p-${field.key} initial value does not match manifest default`);
+        fail(`${effectId}：console.js rtx-p-${field.key} 初始 value 與 manifest default 不一致`);
       }
     } else {
       if (String(el.value ?? "") !== String(field.def)) {
-        fail(`${effectId}: console.js rtx-p-${field.key} initial value does not match manifest default`);
+        fail(`${effectId}：console.js rtx-p-${field.key} 初始 value 與 manifest default 不一致`);
       }
     }
   }
@@ -727,7 +727,7 @@ function validateConsolePlugin(effectId, source, entry, icons, fail, warn) {
     if (!isPlainObject(spec)) continue;
     if (spec.editable === false || spec.type === "array") {
       if (dom.document.getElementById(`rtx-p-${key}`)) {
-        warn(`${effectId}: console.js render creates rtx-p-${key} for non-editable or array param`);
+        warn(`${effectId}：console.js render 為非 editable 或 array param 建立了 rtx-p-${key}`);
       }
     }
   }
@@ -735,7 +735,7 @@ function validateConsolePlugin(effectId, source, entry, icons, fail, warn) {
   compareDefaultObject(effectId, "console", extractDefaultObject(source), entry, fail, warn);
 }
 
-test("effect catalog matches manifest, folders, viewer plugins, and console plugins", () => {
+test("特效 catalog 必須與 manifest、資料夾、viewer plugins 與 console plugins 一致", () => {
   const errors = [];
   const warnings = [];
   const fail = (message) => errors.push(message);
@@ -745,7 +745,7 @@ test("effect catalog matches manifest, folders, viewer plugins, and console plug
   try {
     manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   } catch (error) {
-    fail(`cannot read or parse effects/effects.json: ${error.message}`);
+    fail(`無法讀取或解析 effects/effects.json：${error.message}`);
   }
 
   const effectDirs = listEffectDirs();
@@ -753,16 +753,16 @@ test("effect catalog matches manifest, folders, viewer plugins, and console plug
   try {
     icons = loadIcons();
   } catch (error) {
-    fail(`cannot load console/icons.js: ${error.message}`);
+    fail(`無法載入 console/icons.js：${error.message}`);
   }
 
   if (manifest !== null && validateManifest(manifest, fail, warn)) {
     const manifestIds = Object.keys(manifest.effects);
     for (const id of manifestIds) {
-      if (!effectDirs.includes(id)) fail(`manifest effect ${id} is missing effects/${id}/`);
+      if (!effectDirs.includes(id)) fail(`manifest effect ${id} 缺少 effects/${id}/`);
     }
     for (const dir of effectDirs) {
-      if (!manifestIds.includes(dir)) fail(`effects/${dir}/ exists but is not registered in effects.json`);
+      if (!manifestIds.includes(dir)) fail(`effects/${dir}/ 存在但未登記於 effects.json`);
     }
 
     for (const id of manifestIds) {
@@ -775,13 +775,13 @@ test("effect catalog matches manifest, folders, viewer plugins, and console plug
       const consolePath = join(dirPath, "console.js");
 
       if (!existsSync(viewerPath)) {
-        fail(`${id}: missing effects/${id}/viewer.js`);
+        fail(`${id}：缺少 effects/${id}/viewer.js`);
       } else {
         let source;
         try {
           source = readFileSync(viewerPath, "utf8");
         } catch (error) {
-          fail(`${id}: cannot read viewer.js: ${error.message}`);
+          fail(`${id}：無法讀取 viewer.js：${error.message}`);
           source = null;
         }
         if (source !== null) validateViewerPlugin(id, source, entry, fail, warn);
@@ -792,7 +792,7 @@ test("effect catalog matches manifest, folders, viewer plugins, and console plug
         try {
           source = readFileSync(consolePath, "utf8");
         } catch (error) {
-          fail(`${id}: cannot read console.js: ${error.message}`);
+          fail(`${id}：無法讀取 console.js：${error.message}`);
           source = null;
         }
         if (source !== null) validateConsolePlugin(id, source, entry, icons, fail, warn);
@@ -801,7 +801,7 @@ test("effect catalog matches manifest, folders, viewer plugins, and console plug
       for (const fileName of readdirSync(dirPath)) {
         if (fileName.startsWith(".")) continue;
         if (fileName !== "viewer.js" && fileName !== "console.js") {
-          warn(`${id}: unexpected file effects/${id}/${fileName}`);
+          warn(`${id}：未預期檔案 effects/${id}/${fileName}`);
         }
       }
     }
@@ -811,5 +811,5 @@ test("effect catalog matches manifest, folders, viewer plugins, and console plug
     console.warn(warnings.join("\n"));
   }
 
-  assert.equal(errors.length, 0, errors.join("\n"));
+  assert.equal(errors.length, 0, `Catalog 錯誤：\n${errors.join("\n")}`);
 });
