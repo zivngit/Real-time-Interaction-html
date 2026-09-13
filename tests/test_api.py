@@ -192,6 +192,22 @@ def test_reload_v2_appends_enabled_effect_omitted_from_layout(client, reload_cat
     assert body["alternateEffects"] == ["firework", "text"]
 
 
+def test_reload_v2_filters_disabled_effect_from_layout(client, reload_catalog, tmp_path):
+    raw = json.loads(EFFECTS_V2.read_text(encoding="utf-8"))
+    raw["currentEffects"] = ["particle", "ripple", "legacy"]
+    path = tmp_path / "v2-disabled-in-layout.json"
+    path.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+    reload_catalog["use"](path)
+    r = client.post("/api/effects/reload")
+    assert r.status_code == 200
+    assert r.json()["changed"] is True
+    body = client.get("/api/effects").json()
+    assert body["version"] == 2
+    assert body["currentEffects"] == ["particle", "ripple"]
+    assert body["alternateEffects"] == ["firework", "text"]
+    assert "legacy" not in body["effects"]
+
+
 def test_reload_invalid_v2_layout_preserves_old_catalog(client, reload_catalog, tmp_path):
     before = client.get("/api/effects").json()
     raw = json.loads(EFFECTS_V2.read_text(encoding="utf-8"))
@@ -641,6 +657,9 @@ def test_sse_manifest_broadcast_on_reload(live_server, reload_catalog):
     assert events
     assert events[0]["rev"] == r.json()["rev"]
     assert events[0]["effects"]["particle"]["label"] == "Reloaded Particle"
+    assert set(events[0]) >= {"rev", "version", "effects", "currentEffects", "alternateEffects"}
+    assert isinstance(events[0]["currentEffects"], list)
+    assert isinstance(events[0]["alternateEffects"], list)
 
 
 def test_examples_disabled_by_default(client, monkeypatch):

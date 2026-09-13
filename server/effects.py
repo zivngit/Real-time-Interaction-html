@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import os
 import re
 import threading
@@ -11,6 +12,7 @@ MANIFEST_PATH = Path(os.environ.get("RTX_EFFECTS_MANIFEST", str(EFFECTS_DIR / "e
 
 EFFECT_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 PARAM_TYPES = {"integer", "number", "string", "color", "boolean", "select", "array"}
+logger = logging.getLogger(__name__)
 
 
 class ManifestError(ValueError):
@@ -61,24 +63,28 @@ def _normalize_manifest_layout(raw: dict) -> dict[str, list[str]]:
     for effect_id in raw_current:
         if effect_id not in effects:
             raise ManifestError(f"currentEffects contains unknown effect: {effect_id}")
-        if not _is_enabled(effects[effect_id]):
-            raise ManifestError(f"currentEffects contains disabled effect: {effect_id}")
     for effect_id in raw_alternate:
         if effect_id not in effects:
             raise ManifestError(f"alternateEffects contains unknown effect: {effect_id}")
-        if not _is_enabled(effects[effect_id]):
-            raise ManifestError(f"alternateEffects contains disabled effect: {effect_id}")
     overlap = set(raw_current) & set(raw_alternate)
     if overlap:
         raise ManifestError("currentEffects and alternateEffects cannot share IDs")
 
+    enabled_set = set(enabled_ids)
+    for effect_id in raw_current:
+        if effect_id not in enabled_set:
+            logger.warning("currentEffects contains disabled effect %s; excluded from layout", effect_id)
+    for effect_id in raw_alternate:
+        if effect_id not in enabled_set:
+            logger.warning("alternateEffects contains disabled effect %s; excluded from layout", effect_id)
+
     current: list[str] = []
     for effect_id in raw_current:
-        if effect_id not in current:
+        if effect_id in enabled_set and effect_id not in current:
             current.append(effect_id)
     alternate: list[str] = []
     for effect_id in raw_alternate:
-        if effect_id not in current and effect_id not in alternate:
+        if effect_id in enabled_set and effect_id not in current and effect_id not in alternate:
             alternate.append(effect_id)
     for effect_id in enabled_ids:
         if effect_id not in current and effect_id not in alternate:

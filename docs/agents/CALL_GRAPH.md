@@ -130,7 +130,7 @@ sequenceDiagram
     Note over V: examples/embed-viewer.html（＋embed-both.html）載入 /viewer/app.js\n/viewer/app.js 若 Effects 未載入會動態載入 /viewer/effects.js\nfetch /api/effects → 並行動態載入各 /effects/{id}/viewer.js（單一失敗僅 log 並跳過該特效）
     Note over C: 手動重載：展開 #rtx-conn-panel → 點擊 SVG #rtx-reload-btn → POST /api/effects/reload → GET /api/effects → applyManifest(rev, resetRegistry=true)
     C->>S: POST /api/effects/reload
-    S->>S: check_key → reload_limiter.check(1) → reload_effects（fingerprint 未變則 changed=false；驗證失敗回 400 並保留舊 catalog）
+    S->>S: check_key → reload_limiter.check(1) → reload_effects（fingerprint 未變則 changed=false；驗證失敗回 400 並保留舊 catalog；v2 layout 中 disabled ID 正規化時過濾並記 warning，不視為驗證錯誤）
     S-->>V: SSE event: manifest（changed=true 時，含 rev/effects）
     V->>V: loadViewerPlugins：Effects.reset → 依 rev cache-busting 載入 viewer.js；不清除 active effects
     C->>C: reloadEffectsTable：GET /api/effects → loadConsolePlugins → renderEffects
@@ -314,7 +314,7 @@ classDiagram
 ```mermaid
 flowchart LR
     TF["tests/fixtures/effects.json＋effects-v2.json<br/>v1／v2 測試 manifest"]
-    TA["tests/test_api.py<br/>pytest＋TestClient（46）<br/>v1／v2 fixture manifest、enabled filtering、layout 正規化、temp reload manifest"] --> M["server/main.py<br/>＋server/config.py、security.py、params.py、relay.py、static_files.py、effects.py"]
+    TA["tests/test_api.py<br/>pytest＋TestClient（47）<br/>v1／v2 fixture manifest、enabled filtering、layout 正規化、disabled-in-layout 過濾回歸、SSE manifest 結構、temp reload manifest"] --> M["server/main.py<br/>＋server/config.py、security.py、params.py、relay.py、static_files.py、effects.py"]
     TA --> TF
     TE["tests/test_effects.mjs<br/>node --test＋vm（18）"] --> S["viewer/effects.js ＋ effects/*/viewer.js"]
     TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（63）<br/>v1／v2 payload、雙區渲染、layout button、fx drag、fx drag 往返、move hook、localStorage"] --> K["console/app.js ＋ effects/*/console.js"]

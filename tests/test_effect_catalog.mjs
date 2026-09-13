@@ -327,7 +327,7 @@ function validateLayout(manifest, effects, fail, warn) {
     } else if (!effects[effectId]) {
       fail(`currentEffects 含有未登記 effect：${effectId}`);
     } else if (!isEffectEnabled(effects[effectId])) {
-      fail(`currentEffects 含有 disabled effect：${effectId}`);
+      warn(`currentEffects 含有 disabled effect：${effectId}，正規化後將被排除`);
     }
   }
   for (const effectId of rawAlternate) {
@@ -336,7 +336,7 @@ function validateLayout(manifest, effects, fail, warn) {
     } else if (!effects[effectId]) {
       fail(`alternateEffects 含有未登記 effect：${effectId}`);
     } else if (!isEffectEnabled(effects[effectId])) {
-      fail(`alternateEffects 含有 disabled effect：${effectId}`);
+      warn(`alternateEffects 含有 disabled effect：${effectId}，正規化後將被排除`);
     }
   }
   if (new Set(rawCurrent).size !== rawCurrent.length) {
@@ -881,4 +881,26 @@ test("特效 catalog 必須與 manifest、資料夾、viewer plugins 與 console
   }
 
   assert.equal(errors.length, 0, `Catalog 錯誤：\n${errors.join("\n")}`);
+});
+
+test("disabled effect 在 layout 陣列時給 warn（正規化後排除），不視為錯誤", () => {
+  const errors = [];
+  const warnings = [];
+  const fail = (message) => errors.push(message);
+  const warn = (message) => warnings.push(message);
+  const manifest = {
+    version: 2,
+    currentEffects: ["on", "off"],
+    alternateEffects: ["other", "off2"],
+    effects: {
+      on: { label: "On" },
+      off: { label: "Off", enabled: false },
+      other: { label: "Other" },
+      off2: { label: "Off2", enabled: false },
+    },
+  };
+  validateLayout(manifest, manifest.effects, fail, warn);
+  assert.equal(errors.length, 0, `不應該有錯誤：\n${errors.join("\n")}`);
+  assert.ok(warnings.includes("currentEffects 含有 disabled effect：off，正規化後將被排除"));
+  assert.ok(warnings.includes("alternateEffects 含有 disabled effect：off2，正規化後將被排除"));
 });
