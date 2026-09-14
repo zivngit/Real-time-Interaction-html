@@ -38,5 +38,21 @@
 2.  **執行與測試 (Execute & Test)**：撰寫程式碼並執行單元/整合測試，確保完全符合品質保證要求。
 3.  **文件同步 (Document)**：根據程式碼的變更，同步更新 `CALL_GRAPH.md`（若涉及架構變動）與 `TODO.md`（標記完成）。
 4.  **提交與報告 (Commit & Report)**：
-    *   生成具描述性的 Git commit。
+    *   依第 4 節 Git commit 慣例生成 commit。
     *   於 `.\docs\agents\reports` 目錄下產生本次任務的 Markdown 工作完成報告（格式遵循 `REPORT_TEMPLATE.md`）。
+
+---
+
+## 4. Git commit 慣例
+
+Commit 訊息遵循 Conventional Commits 格式，以中文撰寫，僅寫一行主旨（subject），不撰寫 body：
+
+-   **格式**：`<type>(<scope>): <描述>`
+    -   **type**：`feat`（新功能）、`fix`（缺陷修正）、`test`（測試）、`style`（樣式）、`refactor`（重構）、`chore`（建置／雜務）、`docs`（文件）。
+    -   **scope**：受影響的模組或目錄名稱（如 `console`、`effects`、`examples`、`server`）；跨模組或全域變更可省略 scope。
+    -   **描述**：簡述變更內容，不以句號結尾。
+-   **提交配對**：每項任務拆為兩個 commit，先功能後文件，報告檔不得與程式碼混於同一 commit：
+    -   功能 commit 描述程式碼／配置／文件變更，例如 `feat(effects): 支援 manifest v2 與 console 雙區特效布局`。
+    -   文件 commit 僅提交工作報告（及報告相關的同步文件），訊息格式為 `docs: 記錄<任務摘要>工作報告（NNN）`，NNN 與報告檔名序列號一致；一次涵蓋多份報告時以區間表示，例如 `docs: 記錄 effects reload 相關工作報告（032~034）`。
+-   **提交順序**：先完成程式碼與文件變更並確認測試通過後提交功能 commit，取得 commit hash 後再撰寫工作報告（填入「Git Commit」節），最後提交文件 commit。
+-   **分支命名**：主要分支為 `master`；功能／修復分支使用 kebab-case 英文短名（如 `fx-flip-pointer-drag`、`effects-button-layout`）。
