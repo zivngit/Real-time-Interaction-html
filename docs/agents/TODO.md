@@ -12,7 +12,7 @@
 
 - SSE 斷線期間特效遺失（規格：不重播）
 - 限頻為全域滑動視窗（未區分客戶端）
-- 前端（console/viewer）已有 Playwright 瀏覽器 E2E（`tests/e2e/`，27 項）；console 另有 node vm 冒煙測試（`tests/test_console.mjs`，71 項），viewer 另有 node vm 冒煙測試（`tests/test_effects.mjs`，18 項），特效範例另有 node vm 冒煙測試（`tests/test_effect_examples.mjs`，16 項），正式 catalog 另有 node vm 驗證測試（`tests/test_effect_catalog.mjs`，2 項）
+- 前端（console/viewer）已有 Playwright 瀏覽器 E2E（`tests/e2e/`，28 項）；console 另有 node vm 冒煙測試（`tests/test_console.mjs`，72 項），viewer 另有 node vm 冒煙測試（`tests/test_effects.mjs`，18 項），特效範例另有 node vm 冒煙測試（`tests/test_effect_examples.mjs`，16 項），正式 catalog 另有 node vm 驗證測試（`tests/test_effect_catalog.mjs`，2 項）
 
 ## 第一階段：建立可維護的執行基礎
 
@@ -68,6 +68,7 @@
 - [x] console 特效按鈕 pointer 拖曳插入改為 grid-aware row-major：修復拖曳時與其他按鈕高度重疊、放開後回到重疊按鈕旁邊的問題；原因是舊 `fxInsertionRef()` 以 `document.elementFromPoint()`／`.closest(".rtx-fx")` 判斷 hovered button 並無條件插入其前，當拖曳按鈕已在 hovered button 之前時 DOM 順序不變、相鄰按鈕未順移；新增 `fxLayoutRect()`／`fxStoreLayoutRects()` 與 `__fxLayoutRect` 暫存 layout rect，`fxInsertionRef()` 改以 4 欄 grid 的 row-major 位置決定插入點（同欄以 pointer x 與 non-dragged button center 比較、行末後插入下一行、空欄不跨行跳動），`fxPlayMove()`／`fxFollowCursor()` 在讀取 layout rect 前先暫時移除 FLIP transform；`tests/test_console.mjs` 假 `getBoundingClientRect` 改為 4 欄 grid 並新增 row-major 插入與空欄不跨行 2 項測試（共 71 項）；`tests/e2e/fx-layout.spec.js` 新增 pointer drag 置於 hovered button 右半側時插入其後的 E2E 驗證，Playwright E2E 更新為 24 項（2026-09-13）
 - [x] console 特效按鈕 pointer 拖曳插入修復 stale layout rects：針對垂直方向拖曳時 row boundary 因 `__fxLayoutRect` 未即時刷新而偏移的問題，新增 `fxMeasureLayoutRect()` 在讀取 rect 前暫時移除 `transform` 再還原；`fxStoreLayoutRects()` 改用該安全量測，`fxFollowCursor()` 於套用 drag transform 前先刷新 `__fxLayoutRect`，pointermove 激活後與 `fxReorderTo()` 插入 DOM 後皆呼叫 `fxStoreLayoutRects()`，確保 row-major 插入使用目前 layout 位置；`tests/e2e/helpers.js` 的 `ensurePanelOpen()` 等待 `#rtx-panel` transform 完成，避免 panel open transition 污染 drag 起始幾何；`tests/e2e/fx-layout.spec.js` 新增從上方／下方接近 target row 的 2 項 pointer drag regression tests，Playwright E2E 更新為 26 項（2026-09-13）
 - [x] console 特效按鈕 pointer 拖曳觸發距離統一：同區 pointer 拖曳時 `fxInsertionRef()` 改以 pointer 到 non-dragged button center 的最小距離判斷，在 `FX_DRAG_TRIGGER_PX`（30px）內才依該按鈕決定插入 before／after（pointer x 與該按鈕 center 比較、`nextAfter` 取 row-major 順序）且僅在結果順序與目前 layout 不同時回傳 reorder ref；超出範圍回傳「維持目前位置」ref，`fxReorderTo()` 改以完整目前順序 vs target 順序比較，相等時跳過 `insertBefore` 與 FLIP；跨區拖曳維持原 row-major 插入；將 `tests/e2e/fx-drag-trigger-distance.tmp.spec.js` 轉為正式 `tests/e2e/fx-drag-trigger-distance.spec.js`，以 8 方向驗證真實觸發距離皆約 30px、無 overshoot 且結果 order 符合預期，Playwright E2E 更新為 27 項（2026-09-14）
+- [x] console 特效按鈕在次要區關閉時禁止移動：`#rtx-fx-alternate` 未 `.open` 時 `.rtx-fx` 的 `pointerdown` 不啟動拖曳（不 `preventDefault`、不設 `fxDrag`，click 選擇維持有效），`#rtx-fx-layout` 初始並同步攜帶 `fx-locked` class，CSS `#rtx-fx-layout.fx-locked .rtx-fx { cursor: pointer; }` 顯示不可抓握；layout 按鈕 toggle 時同步 `fx-locked`；既有 drag 測試（console vm 8 項、`fx-layout.spec.js` 3 項、`fx-drag-trigger-distance.spec.js` 1 項）改先開啟次要區再拖曳；新增「次要區關閉時拖曳停用、click 仍可選、開啟後拖曳恢復」的 vm 與 e2e 測試；console vm 測試更新為 72 項、Playwright E2E 更新為 28 項（2026-09-14）
 - [ ] 處理 pytest 的 2 個第三方 deprecation warnings：評估加入 `httpx2` 並限制 `anyio>=4.10,<4.15`（已用 temp dependencies 驗證可消除 warnings；2026-09-11 暫不處理）
 - [ ] server 斷線重播暫存（最近 N 則）
 - [ ] viewer 狀態回報（POST /api/status）

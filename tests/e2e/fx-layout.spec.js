@@ -279,6 +279,48 @@ test("pointer drag reorders fx buttons and persists layout", async ({ page }) =>
   expect(errors).toHaveLength(0);
 });
 
+test("fx drag is disabled while alternate zone is closed", async ({ page }) => {
+  const errors = trackPageErrors(page);
+  await loadConsole(page, {
+    rev: "rev-v2",
+    version: 2,
+    currentEffects: ["particle", "ripple"],
+    alternateEffects: ["firework", "text"],
+    effects: EFFECTS,
+  });
+
+  await expect(page.locator("#rtx-fx-alternate")).toBeHidden();
+  const particle = "#rtx-fx-particle";
+  await expect(page.locator(particle)).toHaveCSS("cursor", "pointer");
+  const from = await page.locator(particle).boundingBox();
+  const startX = from.x + from.width / 2;
+  const startY = from.y + from.height / 2;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + 60, startY, { steps: 4 });
+  const state = await fxDragState(page, particle);
+  expect(state.zIndex).toBe("");
+  expect(state.transform).toBe("");
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  expect(await zoneIds(page, "#rtx-fx-current")).toEqual(["particle", "ripple"]);
+  expect(await zoneIds(page, "#rtx-fx-alternate")).toEqual(["firework", "text"]);
+  await page.locator(particle).click();
+  await expect(page.locator(particle)).toHaveClass(/selected/);
+
+  await page.locator("#rtx-fx-layout-btn").click();
+  await expect(page.locator("#rtx-fx-alternate")).toBeVisible();
+  await expect(page.locator(particle)).toHaveCSS("cursor", "grab");
+  const currentBox = await page.locator("#rtx-fx-current").boundingBox();
+  await pointerDragFx(page, particle, {
+    x: currentBox.x + currentBox.width - 20,
+    y: startY,
+  });
+  expect(await zoneIds(page, "#rtx-fx-current")).toEqual(["ripple", "particle"]);
+  expect(await zoneIds(page, "#rtx-fx-alternate")).toEqual(["firework", "text"]);
+  expect(errors).toHaveLength(0);
+});
+
 test("pointer drag inserts after a hovered fx button when on its right side", async ({ page }) => {
   const errors = trackPageErrors(page);
   const effectKeys = Array.from({ length: 8 }, (_, i) => `fx${i + 1}`);
@@ -293,6 +335,9 @@ test("pointer drag inserts after a hovered fx button when on its right side", as
     alternateEffects: [],
     effects,
   });
+
+  await page.locator("#rtx-fx-layout-btn").click();
+  await expect(page.locator("#rtx-fx-alternate")).toBeVisible();
 
   const fourth = await page.locator("#rtx-fx-fx4").boundingBox();
   await pointerDragFx(page, "#rtx-fx-fx1", {
@@ -327,6 +372,9 @@ test("pointer drag selects target row from top using refreshed layout rects", as
     alternateEffects: [],
     effects,
   });
+
+  await page.locator("#rtx-fx-layout-btn").click();
+  await expect(page.locator("#rtx-fx-alternate")).toBeVisible();
 
   const start = await page.locator("#rtx-fx-fx2").boundingBox();
   const target = await page.locator("#rtx-fx-fx6").boundingBox();
@@ -373,6 +421,9 @@ test("pointer drag selects target row from bottom using refreshed layout rects",
     alternateEffects: [],
     effects,
   });
+
+  await page.locator("#rtx-fx-layout-btn").click();
+  await expect(page.locator("#rtx-fx-alternate")).toBeVisible();
 
   const start = await page.locator("#rtx-fx-fx10").boundingBox();
   const target = await page.locator("#rtx-fx-fx6").boundingBox();

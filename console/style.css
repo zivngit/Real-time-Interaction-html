@@ -19,6 +19,7 @@
 .rtx-fx-zone::-webkit-scrollbar-thumb { background: #33475a; border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
 .rtx-fx-zone::-webkit-scrollbar-thumb:hover { background: #4d6a86; border: 2px solid transparent; background-clip: content-box; }
 .rtx-fx.dragging { opacity: 0.85; cursor: grabbing; will-change: transform; box-shadow: 0 12px 24px rgba(0, 0, 0, 0.25); }
+#rtx-fx-layout.fx-locked .rtx-fx { cursor: pointer; }
 .rtx-row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .rtx-fx { width: 52px; height: 52px; border-radius: 50%; padding: 0; background: #1b2530; border: 1px solid #33475a; display: flex; align-items: center; justify-content: center; cursor: grab; touch-action: none; }
 .rtx-fx svg { width: 26px; height: 26px; stroke: #dfe7ee; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; }

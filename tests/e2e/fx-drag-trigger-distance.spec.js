@@ -50,6 +50,8 @@ test("fx drag trigger distance is uniform from eight directions", async ({ page 
     await page.goto("/examples/embed-console.html");
     await effectsResponse;
     await ensurePanelOpen(page);
+    await page.locator("#rtx-fx-layout-btn").click();
+    await expect(page.locator("#rtx-fx-alternate")).toBeVisible();
 
     const targetBox = await page.locator(`#rtx-fx-${TARGET}`).boundingBox();
     const startBox = await page.locator(`#rtx-fx-${c.start}`).boundingBox();

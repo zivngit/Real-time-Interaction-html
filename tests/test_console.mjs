@@ -419,10 +419,12 @@ test("fx buttons use dual-zone fixed grid layout", async () => {
   assert.ok(css.includes(".rtx-fx-zone::-webkit-scrollbar-thumb { background: #33475a; border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }"));
   assert.ok(css.includes(".rtx-fx-zone::-webkit-scrollbar-thumb:hover { background: #4d6a86; border: 2px solid transparent; background-clip: content-box; }"));
   assert.ok(css.includes(".rtx-fx.dragging { opacity: 0.85; cursor: grabbing; will-change: transform; box-shadow: 0 12px 24px rgba(0, 0, 0, 0.25); }"));
+  assert.ok(css.includes("#rtx-fx-layout.fx-locked .rtx-fx { cursor: pointer; }"));
   assert.ok(css.includes("cursor: grab; touch-action: none;"));
   assert.equal(env.node("rtx-fx-current")._children.length, 4);
   assert.equal(env.node("rtx-fx-alternate")._children.length, 0);
   assert.equal(env.node("rtx-fx-alternate").classList.contains("open"), false);
+  assert.equal(env.node("rtx-fx-layout").classList.contains("fx-locked"), true);
 });
 
 test("layout button toggles alternate zone", async () => {
@@ -436,10 +438,47 @@ test("layout button toggles alternate zone", async () => {
   assert.equal(box.classList.contains("open"), true);
   assert.equal(btn.getAttribute("aria-expanded"), "true");
   assert.equal(btn.classList.contains("active"), true);
+  assert.equal(env.node("rtx-fx-layout").classList.contains("fx-locked"), false);
   btn._fire("click");
   assert.equal(box.classList.contains("open"), false);
   assert.equal(btn.getAttribute("aria-expanded"), "false");
   assert.equal(btn.classList.contains("active"), false);
+  assert.equal(env.node("rtx-fx-layout").classList.contains("fx-locked"), true);
+});
+
+test("fx drag is disabled while alternate zone is closed", async () => {
+  const env = await makeEnv({
+    effectsJson: {
+      rev: "rev-v2",
+      version: 2,
+      currentEffects: ["particle", "ripple"],
+      alternateEffects: ["firework", "text"],
+      effects: DEFAULT_EFFECTS,
+    },
+  });
+  assert.equal(env.node("rtx-fx-layout").classList.contains("fx-locked"), true);
+  fxPointerDown(env, "particle", 26, 26);
+  fxPointerMove(env, 114, 26);
+  const particle = env.node("rtx-fx-particle");
+  assert.equal(particle.classList.contains("dragging"), false);
+  assert.equal(particle.style.zIndex, undefined);
+  assert.equal(particle.style.pointerEvents, undefined);
+  assert.equal(particle.style.transform, undefined);
+  fxPointerUp(env);
+  assert.deepEqual(
+    env.node("rtx-fx-current")._children.map((n) => n._id),
+    ["rtx-fx-particle", "rtx-fx-ripple"]
+  );
+  assert.deepEqual(hostList(env.win.__rtxConsoleLayout.getAlternate()), ["firework", "text"]);
+  particle._fire("click");
+  assert.equal(particle.classList.contains("selected"), true);
+  env.node("rtx-fx-layout-btn")._fire("click");
+  assert.equal(env.node("rtx-fx-layout").classList.contains("fx-locked"), false);
+  fxPointerDown(env, "particle", 26, 26);
+  fxPointerMove(env, 114, 26);
+  assert.equal(particle.classList.contains("dragging"), true);
+  fxPointerUp(env);
+  assert.deepEqual(hostList(env.win.__rtxConsoleLayout.getCurrent()), ["ripple", "particle"]);
 });
 
 test("v2 payload renders current and alternate zones", async () => {
@@ -563,6 +602,7 @@ test("dragging fx buttons reorders zones and persists layout", async () => {
     },
   });
 
+  env.node("rtx-fx-layout-btn")._fire("click");
   fxPointerDown(env, "particle", 26, 26);
   fxPointerMove(env, 114, 26);
   const particle = env.node("rtx-fx-particle");
@@ -622,6 +662,7 @@ test("dragging fx button into alternate then back to current persists layout", a
     },
   });
 
+  env.node("rtx-fx-layout-btn")._fire("click");
   fxPointerDown(env, "particle", 26, 26);
   fxPointerMove(env, 300, 130);
   fxPointerUp(env);
@@ -704,6 +745,7 @@ test("pointer reorder animates fx buttons", async () => {
       effects: DEFAULT_EFFECTS,
     },
   });
+  env.node("rtx-fx-layout-btn")._fire("click");
   fxPointerDown(env, "particle", 26, 26);
   fxPointerMove(env, 114, 26);
   assert.deepEqual(env.node("rtx-fx-current")._children.map((n) => n._id), [
@@ -741,6 +783,7 @@ test("pointer drag uses row-major insertion across a 4-column fx grid", async ()
     },
   });
 
+  env.node("rtx-fx-layout-btn")._fire("click");
   fxPointerDown(env, "fx1", 26, 20);
   fxPointerMove(env, 100, 20);
   fxPointerUp(env);
@@ -800,6 +843,7 @@ test("pointer drag does not jump across rows when hovering an empty row slot", a
     },
   });
 
+  env.node("rtx-fx-layout-btn")._fire("click");
   fxPointerDown(env, "fx5", 26, 80);
   fxPointerMove(env, 10, 80);
   fxPointerUp(env);
@@ -822,6 +866,7 @@ test("pointer movement under slop does not drag and still selects", async () => 
       effects: DEFAULT_EFFECTS,
     },
   });
+  env.node("rtx-fx-layout-btn")._fire("click");
   fxPointerDown(env, "ripple", 86, 26);
   fxPointerMove(env, 90, 26);
   fxPointerUp(env);
@@ -843,6 +888,7 @@ test("active fx drag suppresses the following click", async () => {
     },
   });
   env.node("rtx-fx-ripple")._fire("click");
+  env.node("rtx-fx-layout-btn")._fire("click");
   fxPointerDown(env, "particle", 26, 26);
   fxPointerMove(env, 114, 26);
   fxPointerUp(env);
@@ -861,6 +907,7 @@ test("pointercancel finalizes active fx drag", async () => {
       effects: DEFAULT_EFFECTS,
     },
   });
+  env.node("rtx-fx-layout-btn")._fire("click");
   fxPointerDown(env, "particle", 26, 26);
   fxPointerMove(env, 300, 130);
   env.fireWindow("pointercancel", {});

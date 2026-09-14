@@ -50,7 +50,7 @@
   h1.textContent = "控制端 (console)";
   panel.appendChild(h1);
 
-  var fxLayout = make("div", "rtx-fx-layout", "rtx-fx-layout");
+  var fxLayout = make("div", "rtx-fx-layout", "rtx-fx-layout fx-locked");
   var fxCurrent = make("div", "rtx-fx-current", "rtx-fx-zone");
   var fxAlternate = make("div", "rtx-fx-alternate", "rtx-fx-zone");
   fxLayout.appendChild(fxCurrent);
@@ -312,6 +312,9 @@
   var selected = Object.keys(EFFECTS_META)[0];
   var currentRev = "";
   var fxDrag = null;
+  function fxDragEnabled() {
+    return fxAlternate.classList.contains("open");
+  }
   var fxClickSuppressed = false;
   var FX_LAYOUT_STORAGE_KEY = "rtx.fx.layout.v2";
 
@@ -562,6 +565,7 @@
     });
     btn.addEventListener("pointerdown", function (e) {
       if (e.button !== undefined && e.button !== 0) return;
+      if (!fxDragEnabled()) return;
       e.preventDefault();
       fxDrag = {
         btn: btn,
@@ -1092,17 +1096,18 @@
     move: moveEffect,
   };
 
-  function bindToggle(btn, box) {
+  function bindToggle(btn, box, locked) {
     btn.addEventListener("click", function () {
       var open = box.classList.toggle("open");
       btn.classList.toggle("active", open);
       btn.setAttribute("aria-expanded", open ? "true" : "false");
+      if (locked) locked.classList.toggle("fx-locked", !open);
       if (open) applyFabPos();
     });
   }
   bindToggle(paramsBtn, paramsPanel);
   bindToggle(connBtn, connPanel);
-  bindToggle(layoutBtn, fxAlternate);
+  bindToggle(layoutBtn, fxAlternate, fxLayout);
 
   function headers() {
     var h = { "Content-Type": "application/json" };
