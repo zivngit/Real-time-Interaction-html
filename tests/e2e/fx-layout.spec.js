@@ -138,8 +138,10 @@ test("layout move hook reorders zones and persists layout", async ({ page }) => 
 
   const results = await page.evaluate(() => {
     const api = window.__rtxConsoleLayout;
+    api.move("firework", "current", null);
+    const moveTransform = document.querySelector("#rtx-fx-firework").style.transform;
     return [
-      api.move("firework", "current", null),
+      moveTransform,
       api.move("text", "current", "ripple"),
       api.move("particle", "alternate", null),
       api.move("nope", "current", null),
@@ -148,7 +150,8 @@ test("layout move hook reorders zones and persists layout", async ({ page }) => 
     ];
   });
 
-  expect(results).toEqual([true, true, true, false, false, false]);
+  expect(results[0]).not.toBe("");
+  expect(results.slice(1)).toEqual([true, true, false, false, false]);
   expect(await zoneIds(page, "#rtx-fx-current")).toEqual(["text", "ripple", "firework"]);
   expect(await zoneIds(page, "#rtx-fx-alternate")).toEqual(["particle"]);
   expect(await page.evaluate((key) => JSON.parse(window.localStorage.getItem(key)), LAYOUT_KEY)).toEqual({
@@ -159,7 +162,74 @@ test("layout move hook reorders zones and persists layout", async ({ page }) => 
   expect(errors).toHaveLength(0);
 });
 
-test("dragging fx button into alternate then back to current persists layout", async ({ page }) => {
+test("fx move hook animates neighboring fx buttons in the target zone", async ({ page }) => {
+  const errors = trackPageErrors(page);
+  await loadConsole(page, {
+    rev: "rev-v2",
+    version: 2,
+    currentEffects: ["particle", "ripple"],
+    alternateEffects: ["firework", "text"],
+    effects: EFFECTS,
+  });
+
+  const transforms = await page.evaluate(() => {
+    const api = window.__rtxConsoleLayout;
+    api.move("firework", "current", "particle");
+    return {
+      firework: document.querySelector("#rtx-fx-firework").style.transform,
+      particle: document.querySelector("#rtx-fx-particle").style.transform,
+      ripple: document.querySelector("#rtx-fx-ripple").style.transform,
+      text: document.querySelector("#rtx-fx-text").style.transform,
+    };
+  });
+
+  expect(transforms.firework).not.toBe("");
+  expect(transforms.particle).not.toBe("");
+  expect(transforms.ripple).not.toBe("");
+  expect(transforms.text).toBe("");
+  expect(await zoneIds(page, "#rtx-fx-current")).toEqual(["firework", "particle", "ripple"]);
+  expect(await zoneIds(page, "#rtx-fx-alternate")).toEqual(["text"]);
+  expect(errors).toHaveLength(0);
+});
+
+async function fxDragState(page, selector) {
+  return page.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    return {
+      transform: el.style.transform,
+      zIndex: el.style.zIndex,
+      pointerEvents: el.style.pointerEvents,
+    };
+  }, selector);
+}
+
+async function assertFxDragging(page, selector) {
+  const state = await fxDragState(page, selector);
+  expect(state.zIndex).toBe("30");
+  expect(state.pointerEvents).toBe("none");
+  expect(state.transform).toContain("translate(");
+  expect(state.transform).toContain("scale(1.08)");
+}
+
+async function pointerDragFx(page, selector, target, checkSelector = selector) {
+  const from = await page.locator(selector).boundingBox();
+  const startX = from.x + from.width / 2;
+  const startY = from.y + from.height / 2;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(
+    startX + (target.x - startX) / 2,
+    startY + (target.y - startY) / 2,
+    { steps: 4 }
+  );
+  await assertFxDragging(page, checkSelector);
+  await page.mouse.move(target.x, target.y, { steps: 4 });
+  await assertFxDragging(page, checkSelector);
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+}
+
+test("pointer drag reorders fx buttons and persists layout", async ({ page }) => {
   const errors = trackPageErrors(page);
   await loadConsole(page, {
     rev: "rev-v2",
@@ -172,14 +242,21 @@ test("dragging fx button into alternate then back to current persists layout", a
   await page.locator("#rtx-fx-layout-btn").click();
   await expect(page.locator("#rtx-fx-alternate")).toBeVisible();
 
-  const dataTransfer = await page.evaluateHandle(() => new DataTransfer());
-  await page.locator("#rtx-fx-particle").dispatchEvent("dragstart", { dataTransfer });
-  await page
-    .locator("#rtx-fx-alternate")
-    .dispatchEvent("dragover", { clientX: -10, clientY: -10, dataTransfer });
-  await page.locator("#rtx-fx-alternate").dispatchEvent("drop", { dataTransfer });
-  await page.locator("#rtx-fx-particle").dispatchEvent("dragend");
+  const particle = "#rtx-fx-particle";
+  const currentBox = await page.locator("#rtx-fx-current").boundingBox();
+  const alternateBox = await page.locator("#rtx-fx-alternate").boundingBox();
 
+  await pointerDragFx(page, particle, {
+    x: currentBox.x + currentBox.width - 20,
+    y: currentBox.y + currentBox.height / 2,
+  });
+  expect(await zoneIds(page, "#rtx-fx-current")).toEqual(["ripple", "particle"]);
+  expect(await zoneIds(page, "#rtx-fx-alternate")).toEqual(["firework", "text"]);
+
+  await pointerDragFx(page, particle, {
+    x: alternateBox.x + alternateBox.width - 20,
+    y: alternateBox.y + alternateBox.height / 2,
+  });
   expect(await zoneIds(page, "#rtx-fx-current")).toEqual(["ripple"]);
   expect(await zoneIds(page, "#rtx-fx-alternate")).toEqual(["firework", "text", "particle"]);
   expect(await page.evaluate((key) => JSON.parse(window.localStorage.getItem(key)), LAYOUT_KEY)).toEqual({
@@ -188,13 +265,10 @@ test("dragging fx button into alternate then back to current persists layout", a
     alternate: ["firework", "text", "particle"],
   });
 
-  await page.locator("#rtx-fx-particle").dispatchEvent("dragstart", { dataTransfer });
-  await page
-    .locator("#rtx-fx-current")
-    .dispatchEvent("dragover", { clientX: -10, clientY: -10, dataTransfer });
-  await page.locator("#rtx-fx-current").dispatchEvent("drop", { dataTransfer });
-  await page.locator("#rtx-fx-particle").dispatchEvent("dragend");
-
+  await pointerDragFx(page, particle, {
+    x: currentBox.x + currentBox.width - 20,
+    y: currentBox.y + currentBox.height / 2,
+  });
   expect(await zoneIds(page, "#rtx-fx-current")).toEqual(["ripple", "particle"]);
   expect(await zoneIds(page, "#rtx-fx-alternate")).toEqual(["firework", "text"]);
   expect(await page.evaluate((key) => JSON.parse(window.localStorage.getItem(key)), LAYOUT_KEY)).toEqual({
@@ -202,6 +276,132 @@ test("dragging fx button into alternate then back to current persists layout", a
     current: ["ripple", "particle"],
     alternate: ["firework", "text"],
   });
+  expect(errors).toHaveLength(0);
+});
+
+test("pointer drag inserts after a hovered fx button when on its right side", async ({ page }) => {
+  const errors = trackPageErrors(page);
+  const effectKeys = Array.from({ length: 8 }, (_, i) => `fx${i + 1}`);
+  const effects = {};
+  effectKeys.forEach((key) => {
+    effects[key] = { label: key, params: {} };
+  });
+  await loadConsole(page, {
+    rev: "rev-v2",
+    version: 2,
+    currentEffects: effectKeys,
+    alternateEffects: [],
+    effects,
+  });
+
+  const fourth = await page.locator("#rtx-fx-fx4").boundingBox();
+  await pointerDragFx(page, "#rtx-fx-fx1", {
+    x: fourth.x + fourth.width * 0.75,
+    y: fourth.y + fourth.height / 2,
+  });
+
+  expect(await zoneIds(page, "#rtx-fx-current")).toEqual([
+    "fx2",
+    "fx3",
+    "fx4",
+    "fx1",
+    "fx5",
+    "fx6",
+    "fx7",
+    "fx8",
+  ]);
+  expect(errors).toHaveLength(0);
+});
+
+test("pointer drag selects target row from top using refreshed layout rects", async ({ page }) => {
+  const errors = trackPageErrors(page);
+  const effectKeys = Array.from({ length: 12 }, (_, i) => `fx${i + 1}`);
+  const effects = {};
+  effectKeys.forEach((key) => {
+    effects[key] = { label: key, params: {} };
+  });
+  await loadConsole(page, {
+    rev: "rev-v2",
+    version: 2,
+    currentEffects: effectKeys,
+    alternateEffects: [],
+    effects,
+  });
+
+  const start = await page.locator("#rtx-fx-fx2").boundingBox();
+  const target = await page.locator("#rtx-fx-fx6").boundingBox();
+  const upper = await page.locator("#rtx-fx-fx4").boundingBox();
+  const startX = start.x + start.width / 2;
+  const startY = start.y + start.height / 2;
+  const targetX = target.x + target.width / 2;
+  const boundaryY = (upper.y + upper.height + target.y) / 2;
+
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(targetX, boundaryY + 1, { steps: 24 });
+  await assertFxDragging(page, "#rtx-fx-fx2");
+  expect(await zoneIds(page, "#rtx-fx-current")).toEqual([
+    "fx1",
+    "fx3",
+    "fx4",
+    "fx5",
+    "fx6",
+    "fx2",
+    "fx7",
+    "fx8",
+    "fx9",
+    "fx10",
+    "fx11",
+    "fx12",
+  ]);
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  expect(errors).toHaveLength(0);
+});
+
+test("pointer drag selects target row from bottom using refreshed layout rects", async ({ page }) => {
+  const errors = trackPageErrors(page);
+  const effectKeys = Array.from({ length: 12 }, (_, i) => `fx${i + 1}`);
+  const effects = {};
+  effectKeys.forEach((key) => {
+    effects[key] = { label: key, params: {} };
+  });
+  await loadConsole(page, {
+    rev: "rev-v2",
+    version: 2,
+    currentEffects: effectKeys,
+    alternateEffects: [],
+    effects,
+  });
+
+  const start = await page.locator("#rtx-fx-fx10").boundingBox();
+  const target = await page.locator("#rtx-fx-fx6").boundingBox();
+  const lower = await page.locator("#rtx-fx-fx10").boundingBox();
+  const startX = start.x + start.width / 2;
+  const startY = start.y + start.height / 2;
+  const targetX = target.x + target.width / 2;
+  const boundaryY = (target.y + target.height + lower.y) / 2;
+
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(targetX, boundaryY - 1, { steps: 24 });
+  await assertFxDragging(page, "#rtx-fx-fx10");
+  expect(await zoneIds(page, "#rtx-fx-current")).toEqual([
+    "fx1",
+    "fx2",
+    "fx3",
+    "fx4",
+    "fx5",
+    "fx6",
+    "fx10",
+    "fx7",
+    "fx8",
+    "fx9",
+    "fx11",
+    "fx12",
+  ]);
+  await page.mouse.up();
+  await page.waitForTimeout(300);
   expect(errors).toHaveLength(0);
 });
 
@@ -221,16 +421,10 @@ test("empty alternate zone can accept a dragged fx button and persist layout", a
   expect(alternateBox).not.toBeNull();
   expect(alternateBox.height).toBeGreaterThanOrEqual(52);
 
-  const dataTransfer = await page.evaluateHandle(() => new DataTransfer());
-  await page.locator("#rtx-fx-particle").dispatchEvent("dragstart", { dataTransfer });
-  await page.locator("#rtx-fx-alternate").dispatchEvent("dragover", {
-    clientX: alternateBox.x + alternateBox.width / 2,
-    clientY: alternateBox.y + alternateBox.height / 2,
-    dataTransfer,
+  await pointerDragFx(page, "#rtx-fx-particle", {
+    x: alternateBox.x + alternateBox.width / 2,
+    y: alternateBox.y + alternateBox.height / 2,
   });
-  await page.locator("#rtx-fx-alternate").dispatchEvent("drop", { dataTransfer });
-  await page.locator("#rtx-fx-particle").dispatchEvent("dragend");
-
   expect(await zoneIds(page, "#rtx-fx-current")).toEqual(["ripple", "firework", "text"]);
   expect(await zoneIds(page, "#rtx-fx-alternate")).toEqual(["particle"]);
   expect(await page.evaluate((key) => JSON.parse(window.localStorage.getItem(key)), LAYOUT_KEY)).toEqual({
@@ -239,13 +433,11 @@ test("empty alternate zone can accept a dragged fx button and persist layout", a
     alternate: ["particle"],
   });
 
-  await page.locator("#rtx-fx-particle").dispatchEvent("dragstart", { dataTransfer });
-  await page
-    .locator("#rtx-fx-current")
-    .dispatchEvent("dragover", { clientX: -10, clientY: -10, dataTransfer });
-  await page.locator("#rtx-fx-current").dispatchEvent("drop", { dataTransfer });
-  await page.locator("#rtx-fx-particle").dispatchEvent("dragend");
-
+  const currentBox = await page.locator("#rtx-fx-current").boundingBox();
+  await pointerDragFx(page, "#rtx-fx-particle", {
+    x: currentBox.x + currentBox.width - 20,
+    y: currentBox.y + currentBox.height / 2,
+  });
   expect(await zoneIds(page, "#rtx-fx-current")).toEqual(["ripple", "firework", "text", "particle"]);
   expect(await zoneIds(page, "#rtx-fx-alternate")).toEqual([]);
   expect(await page.evaluate((key) => JSON.parse(window.localStorage.getItem(key)), LAYOUT_KEY)).toEqual({

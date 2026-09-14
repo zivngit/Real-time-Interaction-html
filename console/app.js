@@ -154,6 +154,7 @@
   });
 
   var DRAG_SLOP_PX = 8;
+  var FX_DRAG_TRIGGER_PX = 30;
   var FAB_SIZE = 44;
   var GAP = 10;
   var VIEWPORT_MARGIN = 8;
@@ -310,7 +311,8 @@
   var fxButtonEls = [];
   var selected = Object.keys(EFFECTS_META)[0];
   var currentRev = "";
-  var fxDragId = null;
+  var fxDrag = null;
+  var fxClickSuppressed = false;
   var FX_LAYOUT_STORAGE_KEY = "rtx.fx.layout.v2";
 
   function fallbackLayout(effectKeys) {
@@ -399,13 +401,118 @@
     return out;
   }
 
-  function syncLayoutFromDom() {
+  var fxMoveMs = 180;
+
+  function fxReducedMotion() {
+    return (
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    );
+  }
+
+  function fxCaptureRects() {
+    var rects = {};
+    fxButtonEls.forEach(function (btn) {
+      var id = btn.getAttribute("data-fx");
+      if (id && typeof btn.getBoundingClientRect === "function") {
+        rects[id] = btn.getBoundingClientRect();
+      }
+    });
+    return rects;
+  }
+
+  function fxLayoutRect(btn) {
+    if (btn && btn.__fxLayoutRect) return btn.__fxLayoutRect;
+    if (btn && typeof btn.getBoundingClientRect === "function") return btn.getBoundingClientRect();
+    return null;
+  }
+
+  function fxMeasureLayoutRect(btn) {
+    if (!btn || typeof btn.getBoundingClientRect !== "function") return null;
+    var prevTransform = btn.style.transform;
+    btn.style.transform = "none";
+    var r = btn.getBoundingClientRect();
+    if (prevTransform === undefined) delete btn.style.transform;
+    else btn.style.transform = prevTransform;
+    return {
+      left: r.left,
+      top: r.top,
+      width: r.width,
+      height: r.height,
+      right: r.right,
+      bottom: r.bottom,
+    };
+  }
+
+  function fxStoreLayoutRects() {
+    fxButtonEls.forEach(function (btn) {
+      var r = fxMeasureLayoutRect(btn);
+      if (r) btn.__fxLayoutRect = r;
+    });
+  }
+
+  function fxNextFrame(fn) {
+    if (typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(function () {
+        window.requestAnimationFrame(fn);
+      });
+    } else {
+      setTimeout(fn, 0);
+    }
+  }
+
+  function fxPlayMove(rects, skipBtn) {
+    if (!rects || fxReducedMotion()) return;
+    fxButtonEls.forEach(function (btn) {
+      if (btn === skipBtn) return;
+      var id = btn.getAttribute("data-fx");
+      var oldRect = rects[id];
+      if (!oldRect || typeof btn.getBoundingClientRect !== "function") return;
+      var prevTransition = btn.style.transition;
+      var prevTransform = btn.style.transform;
+      btn.style.transition = "none";
+      btn.style.transform = "none";
+      var newRect = btn.getBoundingClientRect();
+      btn.__fxLayoutRect = {
+        left: newRect.left,
+        top: newRect.top,
+        width: newRect.width,
+        height: newRect.height,
+        right: newRect.right,
+        bottom: newRect.bottom,
+      };
+      var dx = oldRect.left - newRect.left;
+      var dy = oldRect.top - newRect.top;
+      if (!dx && !dy) {
+        if (prevTransition === undefined) delete btn.style.transition;
+        else btn.style.transition = prevTransition;
+        if (prevTransform === undefined) delete btn.style.transform;
+        else btn.style.transform = prevTransform;
+        return;
+      }
+      var seq = (btn.__fxMoveSeq = (btn.__fxMoveSeq || 0) + 1);
+      btn.style.transform = "translate(" + dx + "px," + dy + "px)";
+      void btn.offsetWidth;
+      fxNextFrame(function () {
+        if (btn.__fxMoveSeq !== seq) return;
+        btn.style.transition = "transform " + fxMoveMs + "ms cubic-bezier(0.22, 0.8, 0.36, 1)";
+        btn.style.transform = "";
+        function clear() {
+          if (btn.__fxMoveSeq === seq) btn.style.transition = "";
+        }
+        btn.addEventListener("transitionend", clear);
+        setTimeout(clear, fxMoveMs + 100);
+      });
+    });
+  }
+
+  function syncLayoutFromDom(preRects) {
     fxLayoutState = sanitizeLayout(
       { current: zoneTypes(fxCurrent), alternate: zoneTypes(fxAlternate) },
       Object.keys(EFFECTS_META)
     );
     saveLayout();
-    renderFxZone();
+    renderFxZone(preRects);
     selectEffect(selected);
   }
 
@@ -449,29 +556,29 @@
     btn.title = name;
     btn.setAttribute("aria-label", name);
     btn.innerHTML = iconFor(type, e);
-    btn.draggable = true;
     btn.addEventListener("click", function () {
+      if (fxClickSuppressed) return;
       selectEffect(type);
     });
-    btn.addEventListener("dragstart", function (dragEvent) {
-      fxDragId = type;
-      btn.classList.add("dragging");
-      if (dragEvent && dragEvent.dataTransfer) {
-        if (dragEvent.dataTransfer.setData) dragEvent.dataTransfer.setData("text/plain", type);
-        dragEvent.dataTransfer.effectAllowed = "move";
-      }
-    });
-    btn.addEventListener("dragend", function () {
-      btn.classList.remove("dragging");
-      fxDragId = null;
-      syncLayoutFromDom();
+    btn.addEventListener("pointerdown", function (e) {
+      if (e.button !== undefined && e.button !== 0) return;
+      e.preventDefault();
+      fxDrag = {
+        btn: btn,
+        id: type,
+        startX: e.clientX,
+        startY: e.clientY,
+        active: false,
+      };
+      if (btn.setPointerCapture) btn.setPointerCapture(e.pointerId);
     });
     zone.appendChild(btn);
     fxButtonEls.push(btn);
     return btn;
   }
 
-  function renderFxZone() {
+  function renderFxZone(preRects) {
+    var oldRects = preRects || fxCaptureRects();
     fxButtonEls = [];
     fxCurrent.innerHTML = "";
     fxAlternate.innerHTML = "";
@@ -481,6 +588,8 @@
     fxLayoutState.alternate.forEach(function (type) {
       makeFxButton(type, fxAlternate);
     });
+    fxStoreLayoutRects();
+    fxPlayMove(oldRects);
   }
 
   function isSchema(params) {
@@ -760,31 +869,218 @@
   applyFabPos();
   window.__rtxConsoleReady = loadEffects();
 
-  [fxCurrent, fxAlternate].forEach(function (zone) {
-    zone.addEventListener("dragover", function (dragEvent) {
-      dragEvent.preventDefault();
-      if (dragEvent.dataTransfer) dragEvent.dataTransfer.dropEffect = "move";
-      if (!fxDragId) return;
-      var dragged = null;
-      fxButtonEls.forEach(function (btn) {
-        if (btn.getAttribute("data-fx") === fxDragId) dragged = btn;
+  function fxElementFromPoint(x, y) {
+    return document.elementFromPoint ? document.elementFromPoint(x, y) : null;
+  }
+
+  function fxZoneAt(x, y) {
+    var el = fxElementFromPoint(x, y);
+    if (el && el.closest) {
+      var zone = el.closest(".rtx-fx-zone");
+      if (zone === fxCurrent || zone === fxAlternate) return zone;
+    }
+    var currentRect = fxCurrent.getBoundingClientRect();
+    if (x >= currentRect.left && x < currentRect.right && y >= currentRect.top && y < currentRect.bottom) {
+      return fxCurrent;
+    }
+    var alternateRect = fxAlternate.getBoundingClientRect();
+    if (x >= alternateRect.left && x < alternateRect.right && y >= alternateRect.top && y < alternateRect.bottom) {
+      return fxAlternate;
+    }
+    return null;
+  }
+
+  function fxInsertionRef(zone, x, y, dragged) {
+    var items = [];
+    fxButtonEls.forEach(function (btn) {
+      if (!zone.contains || !zone.contains(btn)) return;
+      var r = fxLayoutRect(btn);
+      if (!r) return;
+      items.push({
+        btn: btn,
+        dragged: btn === dragged,
+        left: r.left,
+        top: r.top,
+        right: r.right,
+        bottom: r.bottom,
+        width: r.width || 52,
+        height: r.height || 52,
       });
-      if (!dragged) return;
-      var after = document.elementFromPoint
-        ? document.elementFromPoint(dragEvent.clientX, dragEvent.clientY)
-        : null;
-      var ref = after && after.closest ? after.closest(".rtx-fx") : null;
-      if (ref && ref !== dragged && zone.contains && zone.contains(ref)) {
-        zone.insertBefore(dragged, ref);
-      } else {
-        zone.appendChild(dragged);
+    });
+    if (!items.length) return null;
+    items.sort(function (a, b) {
+      return a.top - b.top || a.left - b.left;
+    });
+    var draggedIndex = -1;
+    var nearest = null;
+    var nearestIndex = -1;
+    var nearestDist = Infinity;
+    for (var ni = 0; ni < items.length; ni += 1) {
+      if (items[ni].btn === dragged) draggedIndex = ni;
+      if (items[ni].dragged) continue;
+      var nearCenterX = items[ni].left + items[ni].width / 2;
+      var nearCenterY = items[ni].top + items[ni].height / 2;
+      var nearDx = x - nearCenterX;
+      var nearDy = y - nearCenterY;
+      var nearDist = Math.sqrt(nearDx * nearDx + nearDy * nearDy);
+      if (nearDist < nearestDist) {
+        nearestDist = nearDist;
+        nearest = items[ni];
+        nearestIndex = ni;
+      }
+    }
+    var draggedId = dragged.getAttribute("data-fx");
+    var currentOrder = zoneTypes(zone);
+    var draggedPos = currentOrder.indexOf(draggedId);
+    function refKeepingCurrentPosition() {
+      if (draggedPos === -1 || draggedPos === currentOrder.length - 1) return null;
+      var nextId = currentOrder[draggedPos + 1];
+      for (var ci = 0; ci < items.length; ci += 1) {
+        if (items[ci].btn.getAttribute("data-fx") === nextId) return items[ci].btn;
+      }
+      return null;
+    }
+    if (draggedIndex !== -1) {
+      if (nearest && nearestDist <= FX_DRAG_TRIGGER_PX) {
+        var nextAfter = null;
+        for (var na = nearestIndex + 1; na < items.length; na += 1) {
+          if (!items[na].dragged) {
+            nextAfter = items[na].btn;
+            break;
+          }
+        }
+        var beforeRef = nearest.btn;
+        var sideRef = x < nearest.left + nearest.width / 2 ? beforeRef : nextAfter;
+        var otherIds = currentOrder.filter(function (id) {
+          return id !== draggedId;
+        });
+        var insertAt = sideRef ? otherIds.indexOf(sideRef.getAttribute("data-fx")) : -1;
+        if (insertAt === -1) insertAt = otherIds.length;
+        otherIds.splice(insertAt, 0, draggedId);
+        if (otherIds.join("\u0000") !== currentOrder.join("\u0000")) return sideRef;
+        return sideRef === beforeRef ? nextAfter : beforeRef;
+      }
+      return refKeepingCurrentPosition();
+    }
+    var rows = [];
+    items.forEach(function (item) {
+      var last = rows[rows.length - 1];
+      var tol = Math.max(8, item.height / 2);
+      if (!last || Math.abs(item.top - last.top) > tol) {
+        last = { top: item.top, bottom: item.bottom, items: [] };
+        rows.push(last);
+      }
+      last.items.push(item);
+      if (item.bottom > last.bottom) last.bottom = item.bottom;
+    });
+    var rowIndex = 0;
+    var bestDist = Infinity;
+    rows.forEach(function (row, i) {
+      var mid = (row.top + row.bottom) / 2;
+      var dist = Math.abs(y - mid);
+      if (dist < bestDist) {
+        bestDist = dist;
+        rowIndex = i;
       }
     });
-    zone.addEventListener("drop", function (dragEvent) {
-      dragEvent.preventDefault();
-      if (fxDragId) syncLayoutFromDom();
+    var rowButtons = rows[rowIndex].items.filter(function (item) {
+      return !item.dragged;
     });
+    var col = rowButtons.length;
+    for (var i = 0; i < rowButtons.length; i += 1) {
+      var center = rowButtons[i].left + rowButtons[i].width / 2;
+      if (x < center) {
+        col = i;
+        break;
+      }
+    }
+    if (col < rowButtons.length) return rowButtons[col].btn;
+    for (var next = rowIndex + 1; next < rows.length; next += 1) {
+      for (var j = 0; j < rows[next].items.length; j += 1) {
+        if (!rows[next].items[j].dragged) return rows[next].items[j].btn;
+      }
+    }
+    return null;
+  }
+
+  function fxReorderTo(x, y) {
+    if (!fxDrag || !fxDrag.active) return;
+    var dragged = fxDrag.btn;
+    var zone = fxZoneAt(x, y);
+    if (!zone) return;
+    var ref = fxInsertionRef(zone, x, y, dragged);
+    var draggedId = fxDrag.id;
+    var current = zoneTypes(zone);
+    var target = current.filter(function (id) {
+      return id !== draggedId;
+    });
+    var insertAt = ref ? target.indexOf(ref.getAttribute("data-fx")) : -1;
+    if (insertAt === -1) insertAt = target.length;
+    target.splice(insertAt, 0, draggedId);
+    if (current.join("\u0000") === target.join("\u0000")) return;
+    var oldRects = fxCaptureRects();
+    zone.insertBefore(dragged, ref || null);
+    fxStoreLayoutRects();
+    fxPlayMove(oldRects, dragged);
+  }
+
+  function fxFollowCursor(x, y) {
+    var btn = fxDrag.btn;
+    var r = fxMeasureLayoutRect(btn);
+    if (!r) return;
+    btn.__fxLayoutRect = r;
+    var dx = x - (r.left + r.width / 2);
+    var dy = y - (r.top + r.height / 2);
+    btn.style.transform = "translate(" + dx + "px," + dy + "px) scale(1.08)";
+  }
+
+  function fxReleaseDrag() {
+    if (!fxDrag) return;
+    var btn = fxDrag.btn;
+    var oldRects = fxCaptureRects();
+    btn.classList.remove("dragging");
+    btn.style.zIndex = "";
+    btn.style.pointerEvents = "";
+    btn.style.transform = "";
+    fxDrag = null;
+    syncLayoutFromDom(oldRects);
+  }
+
+  function fxEndPointer() {
+    if (!fxDrag) return;
+    var wasDrag = fxDrag.active;
+    if (wasDrag) {
+      fxReleaseDrag();
+      fxClickSuppressed = true;
+      setTimeout(function () {
+        fxClickSuppressed = false;
+      }, 0);
+    } else {
+      fxDrag = null;
+    }
+  }
+
+  window.addEventListener("pointermove", function (e) {
+    if (!fxDrag) return;
+    if (!fxDrag.active) {
+      if (
+        Math.abs(e.clientX - fxDrag.startX) <= DRAG_SLOP_PX &&
+        Math.abs(e.clientY - fxDrag.startY) <= DRAG_SLOP_PX
+      ) {
+        return;
+      }
+      fxDrag.active = true;
+      fxDrag.btn.classList.add("dragging");
+      fxDrag.btn.style.zIndex = "30";
+       fxDrag.btn.style.pointerEvents = "none";
+    }
+    fxStoreLayoutRects();
+    fxReorderTo(e.clientX, e.clientY);
+    fxFollowCursor(e.clientX, e.clientY);
+    e.preventDefault();
   });
+  window.addEventListener("pointerup", fxEndPointer);
+  window.addEventListener("pointercancel", fxEndPointer);
 
   window.__rtxConsoleLayout = {
     getCurrent: function () {

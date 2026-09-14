@@ -1,6 +1,6 @@
 # Real-time Interaction html 函式呼叫關係圖
 
-> 最後更新：2026-09-13
+> 最後更新：2026-09-14
 
 ## 1. 整體架構
 
@@ -126,7 +126,7 @@ sequenceDiagram
     participant S as server（server/main.py）
     participant V as viewer（viewer/app.js）
 
-    Note over C: examples/embed-console.html（＋embed-both.html）載入 /console/style.css＋/console/icons.js＋/console/app.js\n初始化 → loadEffects() fetch /api/effects\n成功 → loadConsolePlugins()（依 consoleUrl 動態載入 /effects/{id}/console.js，失敗僅 log 回退）→ renderEffects(meta, payload, persist) 以 server 正規化 currentEffects／alternateEffects 渲染 #rtx-fx-current／#rtx-fx-alternate（icon 優先序：插件 iconSVG → 插件 iconID → manifest icon → RTX_EFFECT_ICONS[type] → generic → fallback；未知特效 generic）\nlayout 優先序：localStorage rtx.fx.layout.v2 → server payload layout → v1／fallback 全 current；sanitizeLayout() 移除未知、重複、disabled 與 stale IDs\n#rtx-fx-layout-btn → toggle #rtx-fx-alternate.open\n拖曳 drop 或 window.__rtxConsoleLayout.move(effectId, targetBlock, beforeId) → moveEffect() → syncLayoutFromDom()／saveLayout()／renderFxZone()\n失敗/空表 → fallback 內建特效\nrenderParams()：已註冊 console 插件優先 plugin.render()，否則依 schema 渲染（editable:false 與 array 不顯示）\nparamsBtn / connBtn → bindToggle()（展開時 applyFabPos()）\napplyFabPos() → panelCandidates() 選最小重疊位置；FAB z-index 高於 panel
+    Note over C: examples/embed-console.html（＋embed-both.html）載入 /console/style.css＋/console/icons.js＋/console/app.js\n初始化 → loadEffects() fetch /api/effects\n成功 → loadConsolePlugins()（依 consoleUrl 動態載入 /effects/{id}/console.js，失敗僅 log 回退）→ renderEffects(meta, payload, persist) 以 server 正規化 currentEffects／alternateEffects 渲染 #rtx-fx-current／#rtx-fx-alternate（icon 優先序：插件 iconSVG → 插件 iconID → manifest icon → RTX_EFFECT_ICONS[type] → generic → fallback；未知特效 generic）\nlayout 優先序：localStorage rtx.fx.layout.v2 → server payload layout → v1／fallback 全 current；sanitizeLayout() 移除未知、重複、disabled 與 stale IDs\n#rtx-fx-layout-btn → toggle #rtx-fx-alternate.open\npointerdown .rtx-fx → 移動超過 DRAG_SLOP_PX 8px 激活 fxDrag（.rtx-fx.dragging、zIndex 30、pointerEvents none）→ window pointermove：fxZoneAt 決定 target zone（fxElementFromPoint 僅用於 zone 判斷 fallback）→ fxStoreLayoutRects() 以 fxMeasureLayoutRect() 刷新 __fxLayoutRect → fxInsertionRef：dragged button 在 target zone 時，僅在 pointer 距 non-dragged button center 在 FX_DRAG_TRIGGER_PX 30px 內才回傳 reorder ref（before／after 以 pointer x 與該按鈕 center 比較、nextAfter 取 row-major 順序），否則回傳維持目前位置的 ref；dragged button 不在 target zone 時以 fxLayoutRect／__fxLayoutRect 在 4 欄 grid 做 row-major 插入 → fxReorderTo 即時 reorder（target 順序與目前順序相等時跳過 insertBefore 與 FLIP；插入 DOM 後再 fxStoreLayoutRects()）＋fxFollowCursor 先 fxMeasureLayoutRect() 再 translate/scale(1.08) → pointerup／pointercancel：fxReleaseDrag → syncLayoutFromDom()／saveLayout()／renderFxZone() 並抑制下一次 click；window.__rtxConsoleLayout.move(effectId, targetBlock, beforeId) → moveEffect() → syncLayoutFromDom()／saveLayout()／renderFxZone()；renderFxZone 重建前先 fxStoreLayoutRects()，再於重建與 pointer reorder 即時移動播放 180ms FLIP 動畫 fxCaptureRects／fxPlayMove，prefers-reduced-motion: reduce 時停用\n失敗/空表 → fallback 內建特效\nrenderParams()：已註冊 console 插件優先 plugin.render()，否則依 schema 渲染（editable:false 與 array 不顯示）\nparamsBtn / connBtn → bindToggle()（展開時 applyFabPos()）\napplyFabPos() → panelCandidates() 選最小重疊位置；FAB z-index 高於 panel
     Note over V: examples/embed-viewer.html（＋embed-both.html）載入 /viewer/app.js\n/viewer/app.js 若 Effects 未載入會動態載入 /viewer/effects.js\nfetch /api/effects → 並行動態載入各 /effects/{id}/viewer.js（單一失敗僅 log 並跳過該特效）
     Note over C: 手動重載：展開 #rtx-conn-panel → 點擊 SVG #rtx-reload-btn → POST /api/effects/reload → GET /api/effects → applyManifest(rev, resetRegistry=true)
     C->>S: POST /api/effects/reload
@@ -277,10 +277,23 @@ classDiagram
         +normalizeLayout(data)
         +sanitizeLayout(layout, effectKeys)
         +zoneTypes(zone)
-        +syncLayoutFromDom()
+        +fxCaptureRects()
+        +fxLayoutRect(btn)
+        +fxMeasureLayoutRect(btn)
+        +fxStoreLayoutRects()
+        +fxPlayMove(rects, skipBtn)
+        +fxNextFrame(fn)
+        +fxElementFromPoint(x, y)
+        +fxZoneAt(x, y)
+        +fxInsertionRef(zone, x, y, dragged)
+        +fxReorderTo(x, y)
+        +fxFollowCursor(x, y)
+        +fxReleaseDrag()
+        +fxEndPointer()
+        +syncLayoutFromDom(preRects)
         +moveEffect(effectId, targetBlock, beforeId)
         +makeFxButton(type, zone)
-        +renderFxZone()
+        +renderFxZone(preRects)
         +renderEffects(meta, payload, persist)
         +normalizeEffects(data)
         +loadEffects()
@@ -317,11 +330,11 @@ flowchart LR
     TA["tests/test_api.py<br/>pytest＋TestClient（47）<br/>v1／v2 fixture manifest、enabled filtering、layout 正規化、disabled-in-layout 過濾回歸、SSE manifest 結構、temp reload manifest"] --> M["server/main.py<br/>＋server/config.py、security.py、params.py、relay.py、static_files.py、effects.py"]
     TA --> TF
     TE["tests/test_effects.mjs<br/>node --test＋vm（18）"] --> S["viewer/effects.js ＋ effects/*/viewer.js"]
-    TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（63）<br/>v1／v2 payload、雙區渲染、layout button、fx drag、fx drag 往返、move hook、localStorage"] --> K["console/app.js ＋ effects/*/console.js"]
+    TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（71）<br/>v1／v2 payload、雙區渲染、layout button、fx move 動畫、pointer drag row-major insertion、slop／click suppression／pointercancel、move hook、localStorage"] --> K["console/app.js ＋ effects/*/console.js"]
     TX["tests/test_effect_examples.mjs<br/>node --test＋vm fake sandbox（16）"] --> X["examples/effects/*/effects.json ＋ viewer.js ＋ console.js"]
-    TG["tests/test_effect_catalog.mjs<br/>node --test＋vm（1）<br/>正式 effects/effects.json、effects/*/viewer.js、選用 console.js"] --> S
+    TG["tests/test_effect_catalog.mjs<br/>node --test＋vm（2）<br/>正式 effects/effects.json、effects/*/viewer.js、選用 console.js"] --> S
     TG --> K
-    TP["tests/e2e/*.spec.js<br/>Playwright E2E（22）<br/>預設 webServer port 8123<br/>fx-layout.spec.js 驗證 v2 雙區、move、fx drag 往返、空次要區拖曳、localStorage、reload fallback<br/>reload-manifest.spec.js 另啟獨立 server＋temp manifest<br/>multi-console-reload.spec.js 另啟兩個獨立 server／key＋selected fallback"] --> M
+    TP["tests/e2e/*.spec.js<br/>Playwright E2E（27）<br/>預設 webServer port 8123<br/>fx-layout.spec.js 驗證 v2 雙區、move（含 FLIP 動畫與相鄰按鈕順移）、pointer drag 往返（Playwright mouse，含 FLIP 動畫與相鄰按鈕順移）、hovered button 右半側 pointer drag 插入其後、從上方／下方接近 target row 的 refreshed layout pointer drag、空次要區 pointer drag、localStorage、reload fallback<br/>fx-drag-trigger-distance.spec.js 以 8 方向驗證 pointer 拖曳觸發距離（約 30px）與預期插入 order<br/>reload-manifest.spec.js 另啟獨立 server＋temp manifest<br/>multi-console-reload.spec.js 另啟兩個獨立 server／key＋selected fallback"] --> M
     TP --> K
     TP --> S
     TP --> TF

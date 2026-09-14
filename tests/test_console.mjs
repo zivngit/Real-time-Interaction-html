@@ -161,6 +161,24 @@ async function makeEnv(opts = {}) {
       c._parent = el;
       return c;
     };
+    el.insertBefore = (c, ref) => {
+      if (ref && el._children.includes(ref)) {
+        const refIdx = el._children.indexOf(ref);
+        const cIdx = el._children.indexOf(c);
+        const sameParent = c._parent === el;
+        if (!(sameParent && cIdx === refIdx - 1)) {
+          if (c._parent && c._parent._children.includes(c)) {
+            c._parent._children.splice(c._parent._children.indexOf(c), 1);
+          }
+          const insertIdx = sameParent && cIdx < refIdx ? refIdx - 1 : refIdx;
+          el._children.splice(insertIdx, 0, c);
+        }
+        c._parent = el;
+      } else {
+        el.appendChild(c);
+      }
+      return c;
+    };
     el.contains = (node) => {
       let n = node;
       while (n) {
@@ -180,6 +198,21 @@ async function makeEnv(opts = {}) {
       return null;
     };
     el._fire = (t, evt) => (el._listeners[t] || []).slice().forEach((fn) => fn(evt));
+    el.getBoundingClientRect = () => {
+      const idx = el._parent ? el._parent._children.indexOf(el) : 0;
+      if (el._id === "rtx-fx-current") {
+        return { left: 0, top: 0, width: 400, height: 100, x: 0, y: 0, right: 400, bottom: 100 };
+      }
+      if (el._id === "rtx-fx-alternate") {
+        return { left: 0, top: 110, width: 400, height: 100, x: 0, y: 110, right: 400, bottom: 210 };
+      }
+      const baseTop = el._parent && el._parent._id === "rtx-fx-alternate" ? 110 : 0;
+      const row = Math.floor(idx / 4);
+      const col = idx % 4;
+      const left = col * 60;
+      const top = baseTop + row * 60;
+      return { left, top, width: 52, height: 52, x: left, y: top, right: left + 52, bottom: top + 52 };
+    };
     return el;
   }
 
@@ -247,6 +280,10 @@ async function makeEnv(opts = {}) {
     CONTROL_CONFIG: config,
     innerWidth: opts.innerWidth || 1000,
     innerHeight: opts.innerHeight || 500,
+    matchMedia: (query) => ({
+      matches: Boolean(opts.reducedMotion) && String(query).includes("reduce"),
+      media: String(query),
+    }),
     addEventListener: (t, fn) => {
       (windowListeners[t] ??= []).push(fn);
     },
@@ -326,6 +363,20 @@ function overlapArea(a, b) {
   return x * y;
 }
 
+const pdown = { button: 0, pointerId: 1, preventDefault() {} };
+
+function fxPointerDown(env, type, x, y) {
+  env.node(`rtx-fx-${type}`)._fire("pointerdown", { clientX: x, clientY: y, ...pdown });
+}
+
+function fxPointerMove(env, x, y) {
+  env.fireWindow("pointermove", { clientX: x, clientY: y, preventDefault() {} });
+}
+
+function fxPointerUp(env) {
+  env.fireWindow("pointerup", {});
+}
+
 test("uses external scoped style and unique ids", async () => {
   const env = await makeEnv();
   assert.ok(css.includes("#rtx-console { display: contents; }"));
@@ -367,7 +418,8 @@ test("fx buttons use dual-zone fixed grid layout", async () => {
   assert.ok(css.includes(".rtx-fx-zone::-webkit-scrollbar-track { background: transparent; }"));
   assert.ok(css.includes(".rtx-fx-zone::-webkit-scrollbar-thumb { background: #33475a; border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }"));
   assert.ok(css.includes(".rtx-fx-zone::-webkit-scrollbar-thumb:hover { background: #4d6a86; border: 2px solid transparent; background-clip: content-box; }"));
-  assert.ok(css.includes(".rtx-fx.dragging { opacity: 0.65; }"));
+  assert.ok(css.includes(".rtx-fx.dragging { opacity: 0.85; cursor: grabbing; will-change: transform; box-shadow: 0 12px 24px rgba(0, 0, 0, 0.25); }"));
+  assert.ok(css.includes("cursor: grab; touch-action: none;"));
   assert.equal(env.node("rtx-fx-current")._children.length, 4);
   assert.equal(env.node("rtx-fx-alternate")._children.length, 0);
   assert.equal(env.node("rtx-fx-alternate").classList.contains("open"), false);
@@ -510,47 +562,46 @@ test("dragging fx buttons reorders zones and persists layout", async () => {
       effects: DEFAULT_EFFECTS,
     },
   });
-  const dragEvent = () => ({
-    preventDefault() {},
-    clientX: 0,
-    clientY: 0,
-    dataTransfer: {
-      setData() {},
-      dropEffect: "",
-    },
-  });
 
+  fxPointerDown(env, "particle", 26, 26);
+  fxPointerMove(env, 114, 26);
   const particle = env.node("rtx-fx-particle");
-  particle._fire("dragstart", dragEvent());
   assert.equal(particle.classList.contains("dragging"), true);
-  env.node("rtx-fx-current")._fire("dragover", dragEvent());
-  env.node("rtx-fx-current")._fire("drop", dragEvent());
-  particle._fire("dragend");
-  assert.equal(particle.classList.contains("dragging"), false);
+  assert.equal(particle.style.zIndex, "30");
+  assert.equal(particle.style.pointerEvents, "none");
+  assert.ok(particle.style.transform.includes("translate("));
+  assert.ok(particle.style.transform.includes("scale(1.08)"));
+  assert.equal(env.node("rtx-fx-ripple").style.transform, "translate(60px,0px)");
+  fxPointerUp(env);
+  assert.equal(env.node("rtx-fx-particle").classList.contains("dragging"), false);
+  assert.equal(env.node("rtx-fx-particle").style.zIndex, undefined);
+  assert.equal(env.node("rtx-fx-particle").style.pointerEvents, undefined);
+  assert.equal(env.node("rtx-fx-particle").style.transform, undefined);
   assert.deepEqual(
     env.node("rtx-fx-current")._children.map((n) => n._id),
     ["rtx-fx-ripple", "rtx-fx-particle"]
   );
   assert.deepEqual(hostList(env.win.__rtxConsoleLayout.getCurrent()), ["ripple", "particle"]);
 
+  fxPointerDown(env, "firework", 26, 130);
+  fxPointerMove(env, 300, 20);
+  fxPointerUp(env);
   const firework = env.node("rtx-fx-firework");
-  firework._fire("dragstart", dragEvent());
-  env.node("rtx-fx-current")._fire("dragover", dragEvent());
-  env.node("rtx-fx-current")._fire("drop", dragEvent());
-  firework._fire("dragend");
+  assert.equal(firework.classList.contains("dragging"), false);
+  assert.equal(firework.closest("#rtx-fx-current"), env.node("rtx-fx-current"));
   assert.deepEqual(hostList(env.win.__rtxConsoleLayout.getCurrent()), ["ripple", "particle", "firework"]);
   assert.deepEqual(hostList(env.win.__rtxConsoleLayout.getAlternate()), ["text"]);
-  assert.equal(firework.closest("#rtx-fx-current"), env.node("rtx-fx-current"));
   assert.deepEqual(
     env.node("rtx-fx-alternate")._children.map((n) => n._id),
     ["rtx-fx-text"]
   );
 
+  fxPointerDown(env, "ripple", 26, 26);
+  fxPointerMove(env, 300, 130);
+  fxPointerUp(env);
   const ripple = env.node("rtx-fx-ripple");
-  ripple._fire("dragstart", dragEvent());
-  env.node("rtx-fx-alternate")._fire("dragover", dragEvent());
-  env.node("rtx-fx-alternate")._fire("drop", dragEvent());
-  ripple._fire("dragend");
+  assert.equal(ripple.classList.contains("dragging"), false);
+  assert.equal(ripple.closest("#rtx-fx-alternate"), env.node("rtx-fx-alternate"));
   assert.deepEqual(hostList(env.win.__rtxConsoleLayout.getCurrent()), ["particle", "firework"]);
   assert.deepEqual(hostList(env.win.__rtxConsoleLayout.getAlternate()), ["text", "ripple"]);
   assert.deepEqual(JSON.parse(env.store["rtx.fx.layout.v2"]), {
@@ -570,22 +621,11 @@ test("dragging fx button into alternate then back to current persists layout", a
       effects: DEFAULT_EFFECTS,
     },
   });
-  const dragEvent = () => ({
-    preventDefault() {},
-    clientX: 0,
-    clientY: 0,
-    dataTransfer: {
-      setData() {},
-      dropEffect: "",
-    },
-  });
-  let particle = env.node("rtx-fx-particle");
 
-  particle._fire("dragstart", dragEvent());
-  env.node("rtx-fx-alternate")._fire("dragover", dragEvent());
-  env.node("rtx-fx-alternate")._fire("drop", dragEvent());
-  particle._fire("dragend");
-  particle = env.node("rtx-fx-particle");
+  fxPointerDown(env, "particle", 26, 26);
+  fxPointerMove(env, 300, 130);
+  fxPointerUp(env);
+  let particle = env.node("rtx-fx-particle");
   assert.equal(particle.classList.contains("dragging"), false);
   assert.equal(particle.closest("#rtx-fx-alternate"), env.node("rtx-fx-alternate"));
   assert.deepEqual(
@@ -604,10 +644,9 @@ test("dragging fx button into alternate then back to current persists layout", a
     alternate: ["firework", "text", "particle"],
   });
 
-  particle._fire("dragstart", dragEvent());
-  env.node("rtx-fx-current")._fire("dragover", dragEvent());
-  env.node("rtx-fx-current")._fire("drop", dragEvent());
-  particle._fire("dragend");
+  fxPointerDown(env, "particle", 146, 130);
+  fxPointerMove(env, 300, 20);
+  fxPointerUp(env);
   particle = env.node("rtx-fx-particle");
   assert.equal(particle.classList.contains("dragging"), false);
   assert.equal(particle.closest("#rtx-fx-current"), env.node("rtx-fx-current"));
@@ -626,6 +665,235 @@ test("dragging fx button into alternate then back to current persists layout", a
     current: ["ripple", "particle"],
     alternate: ["firework", "text"],
   });
+});
+
+test("fx move hook replays FLIP transform then clears it", async () => {
+  const env = await makeEnv({
+    effectsJson: {
+      rev: "rev-v2",
+      version: 2,
+      currentEffects: ["particle", "ripple"],
+      alternateEffects: ["firework", "text"],
+      effects: DEFAULT_EFFECTS,
+    },
+  });
+  env.win.__rtxConsoleLayout.move("ripple", "current", "particle");
+  const ripple = env.node("rtx-fx-ripple");
+  const particle = env.node("rtx-fx-particle");
+  assert.equal(ripple.style.transform, "translate(60px,0px)");
+  assert.equal(ripple.style.transition, "none");
+  assert.equal(particle.style.transform, "translate(-60px,0px)");
+  assert.equal(env.node("rtx-fx-firework").style.transform, undefined);
+  assert.equal(env.node("rtx-fx-text").style.transform, undefined);
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(ripple.style.transform, "");
+  assert.ok(String(ripple.style.transition).includes("transform"));
+  await new Promise((r) => setTimeout(r, 300));
+  assert.equal(ripple.style.transition, "");
+  assert.deepEqual(hostList(env.win.__rtxConsoleLayout.getCurrent()), ["ripple", "particle"]);
+  assert.deepEqual(hostList(env.win.__rtxConsoleLayout.getAlternate()), ["firework", "text"]);
+});
+
+test("pointer reorder animates fx buttons", async () => {
+  const env = await makeEnv({
+    effectsJson: {
+      rev: "rev-v2",
+      version: 2,
+      currentEffects: ["particle", "ripple"],
+      alternateEffects: ["firework", "text"],
+      effects: DEFAULT_EFFECTS,
+    },
+  });
+  fxPointerDown(env, "particle", 26, 26);
+  fxPointerMove(env, 114, 26);
+  assert.deepEqual(env.node("rtx-fx-current")._children.map((n) => n._id), [
+    "rtx-fx-ripple",
+    "rtx-fx-particle",
+  ]);
+  const particle = env.node("rtx-fx-particle");
+  assert.ok(particle.style.transform.includes("translate("));
+  assert.ok(particle.style.transform.includes("scale(1.08)"));
+  const ripple = env.node("rtx-fx-ripple");
+  assert.equal(ripple.style.transform, "translate(60px,0px)");
+  assert.equal(ripple.style.transition, "none");
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(ripple.style.transform, "");
+  assert.ok(String(ripple.style.transition).includes("transform"));
+  assert.ok(env.node("rtx-fx-particle").style.transform.includes("scale(1.08)"));
+  fxPointerUp(env);
+  assert.deepEqual(hostList(env.win.__rtxConsoleLayout.getCurrent()), ["ripple", "particle"]);
+  assert.deepEqual(hostList(env.win.__rtxConsoleLayout.getAlternate()), ["firework", "text"]);
+});
+
+test("pointer drag uses row-major insertion across a 4-column fx grid", async () => {
+  const effectKeys = Array.from({ length: 8 }, (_, i) => "fx" + (i + 1));
+  const effects = {};
+  effectKeys.forEach((key) => {
+    effects[key] = { label: key, params: {} };
+  });
+  const env = await makeEnv({
+    effectsJson: {
+      rev: "rev-v2",
+      version: 2,
+      currentEffects: effectKeys,
+      alternateEffects: [],
+      effects,
+    },
+  });
+
+  fxPointerDown(env, "fx1", 26, 20);
+  fxPointerMove(env, 100, 20);
+  fxPointerUp(env);
+  assert.deepEqual(hostList(env.win.__rtxConsoleLayout.getCurrent()), [
+    "fx2",
+    "fx1",
+    "fx3",
+    "fx4",
+    "fx5",
+    "fx6",
+    "fx7",
+    "fx8",
+  ]);
+
+  fxPointerDown(env, "fx1", 86, 20);
+  fxPointerMove(env, 220, 20);
+  fxPointerUp(env);
+  assert.deepEqual(hostList(env.win.__rtxConsoleLayout.getCurrent()), [
+    "fx2",
+    "fx3",
+    "fx4",
+    "fx1",
+    "fx5",
+    "fx6",
+    "fx7",
+    "fx8",
+  ]);
+
+  fxPointerDown(env, "fx1", 146, 20);
+  fxPointerMove(env, 100, 80);
+  fxPointerUp(env);
+  assert.deepEqual(hostList(env.win.__rtxConsoleLayout.getCurrent()), [
+    "fx2",
+    "fx3",
+    "fx4",
+    "fx5",
+    "fx6",
+    "fx1",
+    "fx7",
+    "fx8",
+  ]);
+});
+
+test("pointer drag does not jump across rows when hovering an empty row slot", async () => {
+  const effectKeys = Array.from({ length: 5 }, (_, i) => "fx" + (i + 1));
+  const effects = {};
+  effectKeys.forEach((key) => {
+    effects[key] = { label: key, params: {} };
+  });
+  const env = await makeEnv({
+    effectsJson: {
+      rev: "rev-v2",
+      version: 2,
+      currentEffects: effectKeys,
+      alternateEffects: [],
+      effects,
+    },
+  });
+
+  fxPointerDown(env, "fx5", 26, 80);
+  fxPointerMove(env, 10, 80);
+  fxPointerUp(env);
+  assert.deepEqual(hostList(env.win.__rtxConsoleLayout.getCurrent()), [
+    "fx1",
+    "fx2",
+    "fx3",
+    "fx4",
+    "fx5",
+  ]);
+});
+
+test("pointer movement under slop does not drag and still selects", async () => {
+  const env = await makeEnv({
+    effectsJson: {
+      rev: "rev-v2",
+      version: 2,
+      currentEffects: ["particle", "ripple"],
+      alternateEffects: ["firework", "text"],
+      effects: DEFAULT_EFFECTS,
+    },
+  });
+  fxPointerDown(env, "ripple", 86, 26);
+  fxPointerMove(env, 90, 26);
+  fxPointerUp(env);
+  const ripple = env.node("rtx-fx-ripple");
+  assert.equal(ripple.classList.contains("dragging"), false);
+  ripple._fire("click");
+  assert.equal(ripple.classList.contains("selected"), true);
+  assert.deepEqual(hostList(env.win.__rtxConsoleLayout.getCurrent()), ["particle", "ripple"]);
+});
+
+test("active fx drag suppresses the following click", async () => {
+  const env = await makeEnv({
+    effectsJson: {
+      rev: "rev-v2",
+      version: 2,
+      currentEffects: ["particle", "ripple"],
+      alternateEffects: ["firework", "text"],
+      effects: DEFAULT_EFFECTS,
+    },
+  });
+  env.node("rtx-fx-ripple")._fire("click");
+  fxPointerDown(env, "particle", 26, 26);
+  fxPointerMove(env, 114, 26);
+  fxPointerUp(env);
+  env.node("rtx-fx-particle")._fire("click");
+  assert.equal(env.node("rtx-fx-ripple").classList.contains("selected"), true);
+  assert.equal(env.node("rtx-fx-particle").classList.contains("selected"), false);
+});
+
+test("pointercancel finalizes active fx drag", async () => {
+  const env = await makeEnv({
+    effectsJson: {
+      rev: "rev-v2",
+      version: 2,
+      currentEffects: ["particle", "ripple"],
+      alternateEffects: ["firework", "text"],
+      effects: DEFAULT_EFFECTS,
+    },
+  });
+  fxPointerDown(env, "particle", 26, 26);
+  fxPointerMove(env, 300, 130);
+  env.fireWindow("pointercancel", {});
+  const particle = env.node("rtx-fx-particle");
+  assert.equal(particle.classList.contains("dragging"), false);
+  assert.equal(particle.style.zIndex, undefined);
+  assert.equal(particle.style.pointerEvents, undefined);
+  assert.equal(particle.style.transform, undefined);
+  assert.deepEqual(hostList(env.win.__rtxConsoleLayout.getCurrent()), ["ripple"]);
+  assert.deepEqual(hostList(env.win.__rtxConsoleLayout.getAlternate()), ["firework", "text", "particle"]);
+  assert.deepEqual(JSON.parse(env.store["rtx.fx.layout.v2"]), {
+    version: 2,
+    current: ["ripple"],
+    alternate: ["firework", "text", "particle"],
+  });
+});
+
+test("reduced motion skips fx move animation", async () => {
+  const env = await makeEnv({
+    reducedMotion: true,
+    effectsJson: {
+      rev: "rev-v2",
+      version: 2,
+      currentEffects: ["particle", "ripple"],
+      alternateEffects: ["firework", "text"],
+      effects: DEFAULT_EFFECTS,
+    },
+  });
+  env.win.__rtxConsoleLayout.move("ripple", "current", "particle");
+  assert.equal(env.node("rtx-fx-ripple").style.transform, undefined);
+  assert.equal(env.node("rtx-fx-ripple").style.transition, undefined);
+  assert.deepEqual(hostList(env.win.__rtxConsoleLayout.getCurrent()), ["ripple", "particle"]);
+  assert.deepEqual(hostList(env.win.__rtxConsoleLayout.getAlternate()), ["firework", "text"]);
 });
 
 test("missing selected effect falls back to first current effect after reload", async () => {
@@ -1254,8 +1522,6 @@ test("connection inputs save to localStorage on change", async () => {
   assert.equal(env.store["rtx.srvUrl"], "http://saved:9000");
   assert.equal(env.store["rtx.srvKey"], "savedKey");
 });
-
-const pdown = { button: 0, pointerId: 1, preventDefault() {} };
 
 test("press + move drags fab and panel follows", async () => {
   const env = await makeEnv();

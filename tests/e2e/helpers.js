@@ -16,6 +16,7 @@ export async function ensurePanelOpen(page) {
     await fab.click();
   }
   await expect(fab).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator("#rtx-panel")).toHaveCSS("transform", "none");
 }
 
 export async function openConsolePage(page) {
