@@ -16,4 +16,7 @@ node_modules/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Server log（RotatingFileHandler 備份檔 .1~.3）
+/server.log*
 /playwright/.auth/

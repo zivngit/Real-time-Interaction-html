@@ -70,6 +70,18 @@
 - [x] console 特效按鈕 pointer 拖曳觸發距離統一：同區 pointer 拖曳時 `fxInsertionRef()` 改以 pointer 到 non-dragged button center 的最小距離判斷，在 `FX_DRAG_TRIGGER_PX`（30px）內才依該按鈕決定插入 before／after（pointer x 與該按鈕 center 比較、`nextAfter` 取 row-major 順序）且僅在結果順序與目前 layout 不同時回傳 reorder ref；超出範圍回傳「維持目前位置」ref，`fxReorderTo()` 改以完整目前順序 vs target 順序比較，相等時跳過 `insertBefore` 與 FLIP；跨區拖曳維持原 row-major 插入；將 `tests/e2e/fx-drag-trigger-distance.tmp.spec.js` 轉為正式 `tests/e2e/fx-drag-trigger-distance.spec.js`，以 8 方向驗證真實觸發距離皆約 30px、無 overshoot 且結果 order 符合預期，Playwright E2E 更新為 27 項（2026-09-14）
 - [x] console 特效按鈕在次要區關閉時禁止移動：`#rtx-fx-alternate` 未 `.open` 時 `.rtx-fx` 的 `pointerdown` 不啟動拖曳（不 `preventDefault`、不設 `fxDrag`，click 選擇維持有效），`#rtx-fx-layout` 初始並同步攜帶 `fx-locked` class，CSS `#rtx-fx-layout.fx-locked .rtx-fx { cursor: pointer; }` 顯示不可抓握；layout 按鈕 toggle 時同步 `fx-locked`；既有 drag 測試（console vm 8 項、`fx-layout.spec.js` 3 項、`fx-drag-trigger-distance.spec.js` 1 項）改先開啟次要區再拖曳；新增「次要區關閉時拖曳停用、click 仍可選、開啟後拖曳恢復」的 vm 與 e2e 測試；console vm 測試更新為 72 項、Playwright E2E 更新為 28 項（2026-09-14）
 - [x] AGENTS.md：新增第 4 節 Git commit 慣例（Conventional Commits 中文主旨、type/scope、功能＋文件雙 commit 配對、提交順序、分支 kebab-case 命名），SOP 3.4 加註引用（2026-09-14）
+- [x] server log 紀錄規格規劃：評估現行 server log 現況，規劃統一格式／層級策略／事件目錄、env 設定（`RTX_LOG_LEVEL`／`RTX_LOG_FILE`）與安全規則；規劃、規格確認清單、完成核對確認清單於 `docs/temp/server-log/`（PLAN／SPEC／CHECK；2026-09-14）
+- [x] 實作 server log 紀錄規格（依 `docs/temp/server-log/PLAN_SERVER_LOG.md`＋SPEC 確認結論：新 `server/logging.py`、事件 log 接線、caplog 測試；完成後依 `CHECK_SERVER_LOG.md` 核對）
+  - [x] server log Phase 1（logging 基礎）：`server/logging.py`（`configure_logging()`／`client_host()`／`resolve_level()`）、config 4 個 env 常數、`main.py` import 階段 `configure_logging()`＋lifespan 生命週期 log（`server_started`／`server_stopped`）、`relay.py` `subscriber_count()`、`tests/test_server_logging.py` 12 項（2026-09-15）
+  - [x] server log Phase 2（broadcast／SSE／限頻審計 log）：relay 事件 log、SSE connect/disconnect/ping、rate_limited、test_api caplog 測試（2026-09-15）
+  - [x] server log Phase 3（安全／manifest／params／assets 事件 log）：auth_denied、manifest_loaded/reloaded/reload_failed/layout_filtered、params_fallback、asset_missing、test_api caplog 測試（2026-09-15）
+  - [x] server log 整合核對：`CHECK_SERVER_LOG.md` K-01~K-43 以 file:line 證據回填、`CALL_GRAPH.md` 更新（logging 模組依賴＋日誌事件流）、`README.md` 環境變數表（log 4 變數）、pytest 73 項通過（2026-09-15）
+  - [x] server log 獨立再核對（R2）與落差修正：不依賴舊表、以 SPEC 原編號逐項重核 74 項（`CHECK_SERVER_LOG_R2.md`）；修正 SPEC E-12「30 秒 ping」文字為 15 秒、`manifest_reload_failed` 之 `error` 值加引號（`server/main.py`）、舊表 C-02 計數修正為 test_api.py 61 支（2026-09-15）
+  - [x] server log 計數文件修正與測試加強：README pytest 41→73、CALL_GRAPH test_api 節點 73→61、報告 058 計數（47→61）修正；`test_manifest_reloaded_log` 補 changed=false 無 `manifest_broadcast` 斷言（2026-09-15）
+- [x] server log 預設寫入檔案：`RTX_LOG_FILE` 預設值由（空）改為 `server.log`（RotatingFileHandler 5 MB × 3；env 設為空＝僅 console）、`.gitignore` 新增 `/server.log*`；`tests/test_server_logging.py` 新增 `isolated_log_file` fixture、預設 handlers 斷言 1→2、新增 `test_default_file_output`，pytest 74 項通過（2026-09-15）
+- [x] README 新增 log 參數設置文檔：新設「Log 參數設置」章節（4 個 `RTX_LOG_*` 參數說明、輪替行為、父目錄需已存在、Windows／Linux env 設定範例、格式與安全規則）；原「環境變數」節下 log 單行說明併入新章節（2026-09-15）
+- [x] log 訊息中 manifest 完整路徑改顯示檔名：`server/effects.py` 之 `load_manifest` 錯誤訊息 `cannot read <完整路徑>` 改為 `cannot read <檔名>`（同步消除 400 response `detail` 之完整路徑）；`test_manifest_reload_failed_log` 加斷言 log／detail 只含檔名、不含完整路徑；pytest 74 項通過（2026-09-15）
+- [x] server-log 分支統整合併至 master：26 個原始 commit 收錄為單一程式碼 commit（統整 053–064）與單一報告 commit、原歷史保留於 `server-log-history` 分支備份、`master` 快進合併（2026-09-15）
 - [ ] 處理 pytest 的 2 個第三方 deprecation warnings：評估加入 `httpx2` 並限制 `anyio>=4.10,<4.15`（已用 temp dependencies 驗證可消除 warnings；2026-09-11 暫不處理）
 - [ ] server 斷線重播暫存（最近 N 則）
 - [ ] viewer 狀態回報（POST /api/status）

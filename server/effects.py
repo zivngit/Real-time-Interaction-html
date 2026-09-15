@@ -73,10 +73,10 @@ def _normalize_manifest_layout(raw: dict) -> dict[str, list[str]]:
     enabled_set = set(enabled_ids)
     for effect_id in raw_current:
         if effect_id not in enabled_set:
-            logger.warning("currentEffects contains disabled effect %s; excluded from layout", effect_id)
+            logger.warning("manifest_layout_filtered id=%s zone=current", effect_id)
     for effect_id in raw_alternate:
         if effect_id not in enabled_set:
-            logger.warning("alternateEffects contains disabled effect %s; excluded from layout", effect_id)
+            logger.warning("manifest_layout_filtered id=%s zone=alternate", effect_id)
 
     current: list[str] = []
     for effect_id in raw_current:
@@ -146,7 +146,7 @@ def load_manifest() -> dict:
     try:
         raw = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise ManifestError(f"cannot read {MANIFEST_PATH}: {exc}") from exc
+        raise ManifestError(f"cannot read {MANIFEST_PATH.name}: {exc}") from exc
     layout = _validate_manifest(raw)
     return raw, layout
 
@@ -235,15 +235,19 @@ def _initialize_catalog() -> None:
     with _MANIFEST_LOCK:
         raw, rev, version, enabled_ids, layout = _load_catalog()
         _apply_catalog(raw, rev, version, enabled_ids, layout)
+        logger.info("manifest_loaded rev=%s version=%s enabled=%d", rev, version, len(enabled_ids))
 
 
 def reload_effects() -> tuple[dict, str, bool]:
     with _MANIFEST_LOCK:
         raw, rev, version, enabled_ids, layout = _load_catalog()
         if rev == MANIFEST_REV:
-            return dict(EFFECTS), MANIFEST_REV, False
-        _apply_catalog(raw, rev, version, enabled_ids, layout)
-        return dict(EFFECTS), MANIFEST_REV, True
+            changed = False
+        else:
+            _apply_catalog(raw, rev, version, enabled_ids, layout)
+            changed = True
+        logger.info("manifest_reloaded changed=%s rev=%s", str(changed).lower(), rev)
+        return dict(EFFECTS), MANIFEST_REV, changed
 
 
 _initialize_catalog()

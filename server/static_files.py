@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 
@@ -5,6 +6,8 @@ from fastapi import HTTPException
 from fastapi.responses import FileResponse
 
 from server.effects import EFFECTS_DIR, EFFECT_ID_RE
+
+logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parent.parent
 VIEWER_APP_JS = ROOT / "viewer" / "app.js"
@@ -23,12 +26,15 @@ def file_response(path: Path, media_type: str, detail: str):
     return FileResponse(path, media_type=media_type, headers=NO_STORE)
 
 
-def effect_asset(effect_id: str, filename: str):
+def effect_asset(effect_id: str, filename: str, client: str | None = None):
+    path = f"/effects/{effect_id}/{filename}"
     if not EFFECT_ID_RE.fullmatch(effect_id):
+        logger.warning("asset_missing path=%s client=%s", path, client or "unknown")
         raise HTTPException(status_code=404, detail="not found")
     target = (EFFECTS_DIR / effect_id / filename).resolve()
     base = EFFECTS_DIR.resolve()
     if not target.is_relative_to(base) or not target.is_file():
+        logger.warning("asset_missing path=%s client=%s", path, client or "unknown")
         raise HTTPException(status_code=404, detail="not found")
     return FileResponse(target, media_type="application/javascript", headers=NO_STORE)
 

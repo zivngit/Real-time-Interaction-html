@@ -124,6 +124,48 @@ pip install -r server/requirements-dev.txt
 npm install
 ```
 
+## 環境變數
+
+| 變數 | 預設 | 說明 |
+| --- | --- | --- |
+| `ACCESS_KEY` | （空） | 存取金鑰；空＝全開放。POST 用 `X-Access-Key` header、SSE 用 `?key=` |
+| `RTX_EFFECTS_MANIFEST` | `effects/effects.json` | 特效 manifest 路徑覆寫 |
+| `SERVE_EXAMPLES` | （停用） | `1`／`true`／`yes` 啟用 `/examples` 示範頁 |
+| `RTX_LOG_LEVEL` | `INFO` | server log 層級（`DEBUG`／`INFO`／`WARNING`／`ERROR`）；無效值回退 `INFO` |
+| `RTX_LOG_FILE` | `server.log` | log 檔路徑；設為空＝僅 console |
+| `RTX_LOG_FILE_MAX_BYTES` | `5242880`（5 MB） | 輪替 log 單一檔案大小上限 |
+| `RTX_LOG_FILE_BACKUP_COUNT` | `3` | 輪替 log 備份檔數量 |
+
+## Log 參數設置
+
+Server log 同時輸出至 console 與檔案（RotatingFileHandler），由「環境變數」表中 `RTX_LOG_*` 4 個變數控制：
+
+- `RTX_LOG_LEVEL`：log 層級（`DEBUG`／`INFO`／`WARNING`／`ERROR`）；無效值回退 `INFO`。
+- `RTX_LOG_FILE`：log 檔路徑（相對 server 啟動目錄），預設 `server.log`；設為空＝僅 console。
+- `RTX_LOG_FILE_MAX_BYTES`：輪替單一檔案大小上限，預設 `5242880`（5 MB）；超過後依序輪替為 `<檔名>.1`、`<檔名>.2`…。
+- `RTX_LOG_FILE_BACKUP_COUNT`：輪替備份檔數量，預設 `3`（即 `server.log` 與 `.1`~`.3`）；超出數量的舊備份刪除。
+- log 檔的父目錄需已存在（不自動建立）；預設 `server.log` 位於啟動目錄，且 `.gitignore` 已忽略 `/server.log*`。
+
+設定範例（於啟動 server 前設定）：
+
+Windows：
+
+```bat
+set RTX_LOG_LEVEL=DEBUG
+set RTX_LOG_FILE=logs\server.log
+python -m uvicorn server.main:app --port 8000
+```
+
+Linux／macOS：
+
+```bash
+export RTX_LOG_LEVEL=DEBUG
+export RTX_LOG_FILE=logs/server.log
+python -m uvicorn server.main:app --port 8000
+```
+
+Log 統一格式為 `時間戳記 層級 logger 訊息`（ISO 8601、含時區；訊息以 `key=value` 事件欄位）。安全規則：log 不含 `ACCESS_KEY` 值與 client 參數值；`client` 欄位為 host-only。
+
 ## 嵌入 viewer
 
 在目標網頁加入：
@@ -250,7 +292,7 @@ npx playwright test
 npm run test
 ```
 
-目前測試數量：pytest 41 項、node 89 項（`test_console` 54、`test_effect_examples` 16、`test_effects` 18、`test_effect_catalog` 1）、Playwright E2E 14 項。
+目前測試數量：pytest 73 項、node 89 項（`test_console` 54、`test_effect_examples` 16、`test_effects` 18、`test_effect_catalog` 1）、Playwright E2E 14 項。
 
 Playwright E2E 會自動啟動 server（port `8123`），並使用 `tests/fixtures/effects.json`，因此預設不會把新特效納入測試。`tests/e2e/reload-manifest.spec.js` 會另啟獨立 server 與 temp manifest，驗證 viewer 自動更新與 console 手動重載／重新整理。`tests/e2e/multi-console-reload.spec.js` 會另啟兩個獨立 server、temp manifest 與不同 `ACCESS_KEY`，驗證不同 server URL / key 的多 Console 端各自重載、被移除 effect 的 selected fallback，且互不影響。
 

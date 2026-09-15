@@ -1,13 +1,13 @@
 # Real-time Interaction html 函式呼叫關係圖
 
-> 最後更新：2026-09-14
+> 最後更新：2026-09-15
 
 ## 1. 整體架構
 
 ```mermaid
 flowchart LR
     C["examples/embed-console.html（＋embed-both.html）<br/>console/icons.js + console/app.js + console/style.css<br/>#rtx-fx-current / #rtx-fx-alternate / #rtx-fx-layout-btn<br/>examples/theme.css + examples/theme.js<br/>（選用載入 /effects/{id}/console.js 插件）"]
-    S["server/main.py（app／routes）<br/>server/config.py + security.py + params.py + relay.py + static_files.py<br/>server/effects.py（FastAPI）<br/>effects/effects.json（manifest，可被 RTX_EFFECTS_MANIFEST 覆寫）"]
+    S["server/main.py（app／routes）<br/>server/config.py + security.py + params.py + relay.py + static_files.py + logging.py<br/>server/effects.py（FastAPI）<br/>effects/effects.json（manifest，可被 RTX_EFFECTS_MANIFEST 覆寫）"]
     V["examples/embed-viewer.html（＋embed-both.html）<br/>viewer/app.js（Effects 未載入時動態載入 viewer/effects.js<br/>載入 /api/effects 後動態載入各 /effects/{id}/viewer.js）<br/>examples/theme.css + examples/theme.js"]
     E["examples/index.html＋theme.css/theme.js<br/>（demo／showcase 索引，opt-in：SERVE_EXAMPLES=1）"]
     LS[("localStorage<br/>rtx.srvUrl / rtx.srvKey / rtx.fx.layout.v2")]
@@ -218,6 +218,7 @@ classDiagram
         <<server/config.py>>
         +ACCESS_KEY
         +RATE_LIMIT_PER_SEC
+        +LOG_LEVEL / LOG_FILE / LOG_FILE_MAX_BYTES / LOG_FILE_BACKUP_COUNT
     }
     class Security {
         <<server/security.py>>
@@ -242,9 +243,15 @@ classDiagram
     class StaticFiles {
         <<server/static_files.py>>
         +file_response(path, media_type, detail)
-        +effect_asset(effect_id, filename)
+        +effect_asset(effect_id, filename, client)
         +examples_enabled()
         +examples_response(path)
+    }
+    class Logging {
+        <<server/logging.py>>
+        +configure_logging(level, file_path, max_bytes, backup_count)
+        +client_host(request)
+        +resolve_level(level)
     }
     class Server {
         <<server/main.py>>
@@ -317,6 +324,8 @@ classDiagram
     Server ..> Relay : add_subscriber / broadcast / event_stream
     Server ..> RateLimiter : rate_limiter.check() / reload_limiter.check(1)
     Server ..> StaticFiles : file_response / effect_asset / examples_response
+    Server ..> Logging : configure_logging() / client_host()
+    Logging ..> ServerConfig : LOG_LEVEL / LOG_FILE / LOG_FILE_MAX_BYTES / LOG_FILE_BACKUP_COUNT
     Params ..> EffectCatalog : effects 參數缺省時讀取 EFFECTS
     EffectCatalog ..> EffectPlugin : manifest 宣告 /effects/<id>/viewer.js
     Server ..> Viewer : SSE effect / clear / ping / manifest
@@ -327,8 +336,10 @@ classDiagram
 ```mermaid
 flowchart LR
     TF["tests/fixtures/effects.json＋effects-v2.json<br/>v1／v2 測試 manifest"]
-    TA["tests/test_api.py<br/>pytest＋TestClient（47）<br/>v1／v2 fixture manifest、enabled filtering、layout 正規化、disabled-in-layout 過濾回歸、SSE manifest 結構、temp reload manifest"] --> M["server/main.py<br/>＋server/config.py、security.py、params.py、relay.py、static_files.py、effects.py"]
+    TA["tests/test_api.py<br/>pytest＋TestClient（61）<br/>v1／v2 fixture manifest、enabled filtering、layout 正規化、disabled-in-layout 過濾回歸、SSE manifest 結構、temp reload manifest、caplog 事件 log（broadcast／SSE／rate_limited／auth_denied／manifest／params_fallback／asset_missing）"] --> M["server/main.py<br/>＋server/config.py、security.py、params.py、relay.py、static_files.py、effects.py"]
     TA --> TF
+    TS["tests/test_server_logging.py<br/>pytest（12）<br/>configure_logging／client_host／resolve_level、env 覆蓋、idempotent、lifespan log"] --> LG["server/logging.py"]
+    LG --> M
     TE["tests/test_effects.mjs<br/>node --test＋vm（18）"] --> S["viewer/effects.js ＋ effects/*/viewer.js"]
     TC["tests/test_console.mjs<br/>node --test＋vm DOM stub（72）<br/>v1／v2 payload、雙區渲染、layout button（含 fx-locked 同步）、fx move 動畫、次要區關閉時拖曳停用、pointer drag row-major insertion、slop／click suppression／pointercancel、move hook、localStorage"] --> K["console/app.js ＋ effects/*/console.js"]
     TX["tests/test_effect_examples.mjs<br/>node --test＋vm fake sandbox（16）"] --> X["examples/effects/*/effects.json ＋ viewer.js ＋ console.js"]
@@ -355,3 +366,27 @@ python -m pytest tests/ -q
 node --test tests/test_effects.mjs tests/test_console.mjs tests/test_effect_examples.mjs tests/test_effect_catalog.mjs
 npx playwright test
 ```
+
+## 8. 日誌事件與輸出流
+
+所有 log 由 `server` logger 樹（`server.<module>`）發出；handler 僅掛於 `server` logger（`configure_logging()`，`server/logging.py:27-52`，於 `server/main.py:15` import 階段呼叫）。輸出：console StreamHandler＋RotatingFileHandler（預設 `server.log`，`RTX_LOG_FILE` 設為空可停用檔案輸出）。
+
+```mermaid
+flowchart LR
+    Env["RTX_LOG_LEVEL / RTX_LOG_FILE<br/>RTX_LOG_FILE_MAX_BYTES / RTX_LOG_FILE_BACKUP_COUNT"] --> Cfg["server/config.py"]
+    Cfg --> Logging["server/logging.py<br/>configure_logging()"]
+    Logging --> ServerLogger["logger: server.*<br/>層級／格式／handlers"]
+    Lifecycle["server/main.py lifespan<br/>server_started / server_stopped（INFO）"] --> ServerLogger
+    Auth["server/security.py check_key<br/>auth_denied（WARNING）"] --> ServerLogger
+    Broadcast["server/relay.py broadcast<br/>effect／clear／manifest_broadcast（INFO）"] --> ServerLogger
+    SSE["server/relay.py event_stream<br/>sse_connected / sse_disconnected（INFO）、sse_ping（DEBUG）"] --> ServerLogger
+    Limit["server/relay.py RateLimiter.check<br/>rate_limited（WARNING）"] --> ServerLogger
+    Manifest["server/effects.py<br/>manifest_loaded / manifest_reloaded（INFO）、manifest_layout_filtered（WARNING）"] --> ServerLogger
+    ReloadFail["server/main.py reload_manifest<br/>manifest_reload_failed（ERROR）"] --> ServerLogger
+    Params["server/params.py normalize_params<br/>params_fallback（DEBUG）"] --> ServerLogger
+    Asset["server/static_files.py effect_asset<br/>asset_missing（WARNING）"] --> ServerLogger
+    ServerLogger --> Console["console stdout"]
+    ServerLogger --> File["RotatingFileHandler<br/>RTX_LOG_FILE（預設 server.log，5MB × 3）"]
+```
+
+安全規則：log 不含 `ACCESS_KEY` 值與 client 參數值；`client` 欄位為 host-only（`client_host()` 優先 `X-Forwarded-For` 第一跳）。

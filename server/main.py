@@ -1,6 +1,8 @@
 import asyncio
+import logging
 import time
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,10 +10,14 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from server.config import ACCESS_KEY, RATE_LIMIT_PER_SEC
-import server.effects as effects
-from server.effects import EFFECTS, ManifestError, reload_effects
+from server.logging import client_host, configure_logging
+
+configure_logging()
+
+import server.effects as effects  # noqa: E402
+from server.effects import EFFECTS, ManifestError, reload_effects  # noqa: E402
 from server.params import normalize_params
-from server.relay import RateLimiter, add_subscriber, broadcast, event_stream
+from server.relay import RateLimiter, add_subscriber, broadcast, event_stream, subscriber_count
 from server.security import check_key
 from server.static_files import (
     CONSOLE_APP_JS,
@@ -24,7 +30,23 @@ from server.static_files import (
     file_response,
 )
 
-app = FastAPI(title="Real-time Interaction relay")
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info(
+        "server_started level=%s rev=%s version=%s enabled=%d",
+        logging.getLevelName(logging.getLogger("server").getEffectiveLevel()),
+        effects.MANIFEST_REV,
+        effects.MANIFEST_VERSION,
+        len(EFFECTS),
+    )
+    yield
+    logger.info("server_stopped subscribers=%d", subscriber_count())
+
+
+app = FastAPI(title="Real-time Interaction relay", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -60,12 +82,16 @@ async def list_effects() -> dict:
 
 
 @app.post("/api/effects/reload")
-async def reload_manifest(x_access_key: str | None = Header(default=None)) -> dict:
-    check_key(ACCESS_KEY, x_access_key, None)
-    await reload_limiter.check(1)
+async def reload_manifest(
+    request: Request,
+    x_access_key: str | None = Header(default=None),
+) -> dict:
+    check_key(ACCESS_KEY, x_access_key, None, path=str(request.url.path), client=client_host(request))
+    await reload_limiter.check(1, path=str(request.url.path), client=client_host(request))
     try:
         new_effects, rev, changed = await asyncio.to_thread(reload_effects)
     except ManifestError as exc:
+        logger.error('manifest_reload_failed error="%s"', exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     if changed:
         broadcast(
@@ -86,12 +112,13 @@ async def reload_manifest(x_access_key: str | None = Header(default=None)) -> di
 @app.post("/api/effect")
 async def post_effect(
     body: EffectRequest,
+    request: Request,
     x_access_key: str | None = Header(default=None),
 ) -> dict:
-    check_key(ACCESS_KEY, x_access_key, None)
+    check_key(ACCESS_KEY, x_access_key, None, path=str(request.url.path), client=client_host(request))
     if body.effect not in EFFECTS:
         raise HTTPException(status_code=400, detail=f"unknown effect: {body.effect}")
-    await rate_limiter.check(RATE_LIMIT_PER_SEC)
+    await rate_limiter.check(RATE_LIMIT_PER_SEC, path=str(request.url.path), client=client_host(request))
     msg = {
         "id": str(uuid.uuid4()),
         "type": "effect",
@@ -106,9 +133,12 @@ async def post_effect(
 
 
 @app.post("/api/clear")
-async def post_clear(x_access_key: str | None = Header(default=None)) -> dict:
-    check_key(ACCESS_KEY, x_access_key, None)
-    await rate_limiter.check(RATE_LIMIT_PER_SEC)
+async def post_clear(
+    request: Request,
+    x_access_key: str | None = Header(default=None),
+) -> dict:
+    check_key(ACCESS_KEY, x_access_key, None, path=str(request.url.path), client=client_host(request))
+    await rate_limiter.check(RATE_LIMIT_PER_SEC, path=str(request.url.path), client=client_host(request))
     msg = {"id": str(uuid.uuid4()), "type": "clear", "ts": int(time.time())}
     broadcast(msg)
     return {"ok": True, "id": msg["id"]}
@@ -119,11 +149,11 @@ async def stream(
     request: Request,
     key: str | None = Query(default=None),
 ):
-    check_key(ACCESS_KEY, None, key)
+    check_key(ACCESS_KEY, None, key, path=str(request.url.path), client=client_host(request))
     queue: asyncio.Queue = asyncio.Queue()
     add_subscriber(queue)
     return StreamingResponse(
-        event_stream(queue, request.is_disconnected),
+        event_stream(queue, request.is_disconnected, client=client_host(request)),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -163,13 +193,13 @@ async def effects_manifest():
 
 
 @app.get("/effects/{effect_id}/viewer.js")
-async def effect_viewer_js(effect_id: str):
-    return effect_asset(effect_id, "viewer.js")
+async def effect_viewer_js(effect_id: str, request: Request):
+    return effect_asset(effect_id, "viewer.js", client=client_host(request))
 
 
 @app.get("/effects/{effect_id}/console.js")
-async def effect_console_js(effect_id: str):
-    return effect_asset(effect_id, "console.js")
+async def effect_console_js(effect_id: str, request: Request):
+    return effect_asset(effect_id, "console.js", client=client_host(request))
 
 
 @app.get("/examples")

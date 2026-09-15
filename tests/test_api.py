@@ -1,6 +1,9 @@
+import asyncio
 import copy
 import json
+import logging
 import os
+import re
 import socket
 import threading
 import time
@@ -701,3 +704,222 @@ def test_examples_enabled_when_serve_examples_set(client, monkeypatch):
     assert r.status_code == 200
     assert "/viewer/app.js" in r.text
     assert "/console/app.js" in r.text
+
+
+def test_effect_broadcast_log(client, caplog):
+    caplog.set_level(logging.INFO, logger="server")
+    r = client.post("/api/effect", json={"effect": "ripple", "x": 1, "y": 1})
+    assert r.status_code == 200
+    assert any(
+        re.search(r"effect_broadcast id=\S+ effect=ripple x=1\.0 y=1\.0 subscribers=\d+", rec.message)
+        for rec in caplog.records
+    )
+
+
+def test_clear_broadcast_log(client, caplog):
+    caplog.set_level(logging.INFO, logger="server")
+    r = client.post("/api/clear")
+    assert r.status_code == 200
+    assert any(re.search(r"clear_broadcast id=\S+ subscribers=\d+", rec.message) for rec in caplog.records)
+
+
+def test_manifest_broadcast_log(client, reload_catalog, caplog):
+    caplog.set_level(logging.INFO, logger="server")
+    m.reload_limiter.reset()
+    reload_catalog["use"](reload_catalog["reloaded"])
+    r = client.post("/api/effects/reload")
+    assert r.status_code == 200
+    assert r.json()["changed"] is True
+    assert any(re.search(r"manifest_broadcast id=\S+ rev=\w+ subscribers=\d+", rec.message) for rec in caplog.records)
+
+
+def _wait_for_log(caplog, needle):
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        if any(needle in rec.message for rec in caplog.records):
+            return
+        time.sleep(0.05)
+    pytest.fail(f"log record containing {needle!r} not captured")
+
+
+def test_sse_connect_disconnect_log(live_server, caplog):
+    caplog.set_level(logging.INFO, logger="server")
+    with httpx.stream("GET", f"{live_server}/api/stream", timeout=httpx.Timeout(30, connect=5)) as r:
+        assert r.status_code == 200
+        next(r.iter_lines())
+    _wait_for_log(caplog, "sse_disconnected")
+    assert any(re.search(r"sse_connected subscribers=\d+ client=\S+", rec.message) for rec in caplog.records)
+    assert any(re.search(r"sse_disconnected subscribers=\d+ client=\S+", rec.message) for rec in caplog.records)
+
+
+def test_sse_ping_debug_log(monkeypatch, caplog):
+    monkeypatch.setattr(relay, "PING_TIMEOUT", 0.05)
+    caplog.set_level(logging.DEBUG, logger="server")
+    queue = asyncio.Queue()
+
+    async def not_disconnected():
+        return False
+
+    async def run():
+        gen = relay.event_stream(queue, not_disconnected, client="test-client")
+        async for chunk in gen:
+            if chunk.startswith("event: ping"):
+                break
+        await gen.aclose()
+
+    asyncio.run(run())
+    assert any("sse_ping" in rec.message for rec in caplog.records)
+    assert any(re.search(r"sse_connected subscribers=\d+ client=test-client", rec.message) for rec in caplog.records)
+
+
+def test_rate_limited_log(client, monkeypatch, caplog):
+    monkeypatch.setattr(m, "RATE_LIMIT_PER_SEC", 2)
+    m.rate_limiter.reset()
+    caplog.set_level(logging.INFO, logger="server")
+    for _ in range(2):
+        assert client.post("/api/effect", json={"effect": "ripple", "x": 1, "y": 1}).status_code == 200
+    r = client.post("/api/effect", json={"effect": "ripple", "x": 1, "y": 1})
+    assert r.status_code == 429
+    assert r.headers["retry-after"] == "1"
+    assert any(
+        rec.levelno == logging.WARNING
+        and re.search(r"rate_limited path=/api/effect client=\S+ limit=2", rec.message)
+        for rec in caplog.records
+    )
+
+
+def test_auth_denied_log(client, monkeypatch, caplog):
+    monkeypatch.setattr(m, "ACCESS_KEY", "secret")
+    caplog.set_level(logging.INFO, logger="server")
+    r = client.post("/api/effect", json={"effect": "ripple", "x": 1, "y": 1})
+    assert r.status_code == 401
+    r = client.get("/api/stream")
+    assert r.status_code == 401
+    assert any(
+        re.search(r"auth_denied path=/api/effect client=\S+ reason=invalid-key", rec.message)
+        for rec in caplog.records
+    )
+    assert any(
+        re.search(r"auth_denied path=/api/stream client=\S+ reason=invalid-key", rec.message)
+        for rec in caplog.records
+    )
+    assert all("secret" not in rec.message for rec in caplog.records)
+
+
+def test_manifest_loaded_log(caplog):
+    caplog.set_level(logging.INFO, logger="server")
+    server.effects._initialize_catalog()
+    assert any(
+        re.search(r"manifest_loaded rev=\w+ version=\d+ enabled=\d+", rec.message)
+        for rec in caplog.records
+    )
+
+
+def test_manifest_reloaded_log(client, reload_catalog, caplog):
+    caplog.set_level(logging.INFO, logger="server")
+    m.reload_limiter.reset()
+    reload_catalog["use"](reload_catalog["reloaded"])
+    r = client.post("/api/effects/reload")
+    assert r.status_code == 200
+    assert r.json()["changed"] is True
+    assert any(
+        re.search(r"manifest_reloaded changed=true rev=\w+", rec.message)
+        for rec in caplog.records
+    )
+    m.reload_limiter.reset()
+    r = client.post("/api/effects/reload")
+    assert r.status_code == 200
+    assert r.json()["changed"] is False
+    assert any(
+        re.search(r"manifest_reloaded changed=false rev=\w+", rec.message)
+        for rec in caplog.records
+    )
+    assert sum("manifest_broadcast" in rec.message for rec in caplog.records) == 1
+
+
+def test_manifest_reload_failed_log(client, reload_catalog, caplog):
+    caplog.set_level(logging.INFO, logger="server")
+    m.reload_limiter.reset()
+    invalid = reload_catalog["invalid"]
+    reload_catalog["use"](invalid)
+    r = client.post("/api/effects/reload")
+    assert r.status_code == 400
+    failed = [
+        rec.message
+        for rec in caplog.records
+        if rec.levelno == logging.ERROR
+        and re.search(r"manifest_reload_failed error=.*", rec.message)
+    ]
+    assert failed
+    assert any(invalid.name in msg for msg in failed)
+    assert not any(str(invalid) in msg for msg in failed)
+    detail = r.json()["detail"]
+    assert invalid.name in detail
+    assert str(invalid) not in detail
+
+
+def test_manifest_layout_filtered_log(reload_catalog, tmp_path, caplog):
+    caplog.set_level(logging.INFO, logger="server")
+    filtered_path = tmp_path / "filtered.json"
+    filtered_raw = {
+        "version": 2,
+        "effects": {
+            "ripple": {"label": "R"},
+            "ghost": {"label": "G", "enabled": False},
+        },
+        "currentEffects": ["ripple", "ghost"],
+        "alternateEffects": [],
+    }
+    filtered_path.write_text(json.dumps(filtered_raw), encoding="utf-8")
+    reload_catalog["use"](filtered_path)
+    server.effects.reload_effects()
+    assert any(
+        rec.levelno == logging.WARNING
+        and re.search(r"manifest_layout_filtered id=ghost zone=current", rec.message)
+        for rec in caplog.records
+    )
+
+
+def test_params_fallback_log(client, caplog):
+    caplog.set_level(logging.DEBUG, logger="server")
+    r = client.post("/api/effect", json={"effect": "ripple", "x": 1, "y": 1, "params": {}})
+    assert r.status_code == 200
+    for key in ("color", "maxRadius", "duration"):
+        assert any(
+            re.search(rf"params_fallback effect=ripple key={key} reason=missing", rec.message)
+            for rec in caplog.records
+        )
+    r = client.post(
+        "/api/effect",
+        json={"effect": "ripple", "x": 1, "y": 1, "params": {"color": "not-a-color", "duration": 1200}},
+    )
+    assert r.status_code == 200
+    assert any(
+        re.search(r"params_fallback effect=ripple key=color reason=invalid", rec.message)
+        for rec in caplog.records
+    )
+    assert not any(
+        re.search(r"params_fallback effect=ripple key=duration reason=invalid", rec.message)
+        for rec in caplog.records
+    )
+    assert all("not-a-color" not in rec.message for rec in caplog.records)
+
+
+def test_params_fallback_not_logged_at_info(client, caplog):
+    caplog.set_level(logging.INFO, logger="server")
+    r = client.post(
+        "/api/effect", json={"effect": "ripple", "x": 1, "y": 1, "params": {"color": "not-a-color"}}
+    )
+    assert r.status_code == 200
+    assert not any("params_fallback" in rec.message for rec in caplog.records)
+
+
+def test_asset_missing_log(client, caplog):
+    caplog.set_level(logging.INFO, logger="server")
+    r = client.get("/effects/ghost/viewer.js")
+    assert r.status_code == 404
+    assert any(
+        rec.levelno == logging.WARNING
+        and re.search(r"asset_missing path=/effects/ghost/viewer\.js client=\S+", rec.message)
+        for rec in caplog.records
+    )

@@ -1,8 +1,11 @@
 import copy
+import logging
 import math
 import re
 
 from server.effects import EFFECTS
+
+logger = logging.getLogger(__name__)
 
 _COLOR_RE = re.compile(r"^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")
 
@@ -88,6 +91,9 @@ def normalize_params(effect_id: str, raw: dict, effects: dict | None = None) -> 
             out[key] = copy.deepcopy(spec.get("default"))
         elif key not in raw:
             out[key] = copy.deepcopy(spec.get("default"))
+            logger.debug("params_fallback effect=%s key=%s reason=missing", effect_id, key)
         else:
             out[key] = _normalize_value(spec, raw[key])
+            if out[key] != raw[key]:
+                logger.debug("params_fallback effect=%s key=%s reason=invalid", effect_id, key)
     return out
