@@ -48,11 +48,11 @@
 Commit 訊息遵循 Conventional Commits 格式，以中文撰寫，僅寫一行主旨（subject），不撰寫 body：
 
 -   **格式**：`<type>(<scope>): <描述>`
-    -   **type**：`feat`（新功能）、`fix`（缺陷修正）、`test`（測試）、`style`（樣式）、`refactor`（重構）、`chore`（建置／雜務）、`docs`（文件）。
+    -   **type**：`feat`（新功能）、`fix`（缺陷修正）、`test`（測試）、`style`（樣式）、`refactor`（重構）、`chore`（建置／雜務）、`docs`（文件）、`report`（工作報告）。`report` 類型自新增該類型的 commit 生效，即 2026-09-15 的「AGENTS.md Git commit 慣例 type 清單新增 report」改動；該改動前的 commit 不溯及。
     -   **scope**：受影響的模組或目錄名稱（如 `console`、`effects`、`examples`、`server`）；跨模組或全域變更可省略 scope。
     -   **描述**：簡述變更內容，不以句號結尾。
--   **提交配對**：每項任務拆為兩個 commit，先功能後文件，報告檔不得與程式碼混於同一 commit：
-    -   功能 commit 描述程式碼／配置／文件變更，例如 `feat(effects): 支援 manifest v2 與 console 雙區特效布局`。
-    -   文件 commit 僅提交工作報告（及報告相關的同步文件），訊息格式為 `docs: 記錄<任務摘要>工作報告（NNN）`，NNN 與報告檔名序列號一致；一次涵蓋多份報告時以區間表示，例如 `docs: 記錄 effects reload 相關工作報告（032~034）`。
--   **提交順序**：先完成程式碼與文件變更並確認測試通過後提交功能 commit，取得 commit hash 後再撰寫工作報告（填入「Git Commit」節），最後提交文件 commit。
+-   **提交配對**：每項任務拆為兩個 commit，先功能後報告；報告與非報告文件不得同 commit：
+    -   功能 commit 包含所有非報告文件變更（程式碼、配置，以及架構圖／任務狀態等同步文件），例如 `feat(effects): 支援 manifest v2 與 console 雙區特效布局`。
+    -   報告 commit 僅提交工作報告，訊息格式為 `report: 記錄<任務摘要>工作報告（NNN）`，NNN 與報告檔名序列號一致；一次涵蓋多份報告時以區間表示，例如 `report: 記錄 effects reload 相關工作報告（032~034）`。
+-   **提交順序**：先完成程式碼與非報告文件變更並確認測試通過後提交功能 commit，取得 commit hash 後再撰寫工作報告（填入「Git Commit」節），最後提交報告 commit。
 -   **分支命名**：主要分支為 `master`；功能／修復分支使用 kebab-case 英文短名（如 `fx-flip-pointer-drag`、`effects-button-layout`）。

@@ -82,6 +82,7 @@
 - [x] README 新增 log 參數設置文檔：新設「Log 參數設置」章節（4 個 `RTX_LOG_*` 參數說明、輪替行為、父目錄需已存在、Windows／Linux env 設定範例、格式與安全規則）；原「環境變數」節下 log 單行說明併入新章節（2026-09-15）
 - [x] log 訊息中 manifest 完整路徑改顯示檔名：`server/effects.py` 之 `load_manifest` 錯誤訊息 `cannot read <完整路徑>` 改為 `cannot read <檔名>`（同步消除 400 response `detail` 之完整路徑）；`test_manifest_reload_failed_log` 加斷言 log／detail 只含檔名、不含完整路徑；pytest 74 項通過（2026-09-15）
 - [x] server-log 分支統整合併至 master：26 個原始 commit 收錄為單一程式碼 commit（統整 053–064）與單一報告 commit、原歷史保留於 `server-log-history` 分支備份、`master` 快進合併（2026-09-15）
+- [x] AGENTS.md：Git commit 慣例 type 清單新增 `report`（工作報告）類型，並註明自 2026-09-15 該次改動的 commit 生效、不溯及先前 commit；提交配對改為報告 commit 僅提交工作報告、訊息改用 `report:` 格式（2026-09-15）
 - [ ] 處理 pytest 的 2 個第三方 deprecation warnings：評估加入 `httpx2` 並限制 `anyio>=4.10,<4.15`（已用 temp dependencies 驗證可消除 warnings；2026-09-11 暫不處理）
 - [ ] server 斷線重播暫存（最近 N 則）
 - [ ] viewer 狀態回報（POST /api/status）
