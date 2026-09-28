@@ -217,15 +217,15 @@ console 特效按鈕以 `#rtx-fx-current`（主要）與 `#rtx-fx-alternate`（�
 
 ## 特效編輯器（`/editor`）
 
-內建視覺化特效編輯器：啟動 server 後開啟 `http://<server-host>:8000/editor/`。三欄布局（左：特效列表、中：manifest／params／程式碼、右：即時預覽；窄視窗時主區橫向捲動、預覽欄維持最小寬）。以下為重點；各功能詳細行為與歷史變更見 `docs/agents/reports/` 與 `docs/agents/CALL_GRAPH.md`。
+內建視覺化特效編輯器：啟動 server 後開啟 `http://<server-host>:8000/editor/`。三欄布局（左：特效列表、中：manifest／params／程式碼、右：即時預覽；窄視窗時主區橫向捲動、預覽欄維持最小寬）。以下為重點；詳見 `docs/agents/CALL_GRAPH.md`。
 
-- **特效列表（左）**：依 manifest（v1／v2 雙區）載入；拖曳排序、多選、批次啟用／停用／移區、刪除、新增特效（server 自動以模板產 `viewer.js`／`console.js`）；**列表不顯示 icon**（console 插件改由預覽區簡化 console 在 [開始預覽] 按需載入，避免 N 個 script 全載）。
+- **特效列表（左）**：依 manifest（v1／v2 雙區）載入；拖曳排序、批次啟用／停用／移區、刪除、新增特效（server 自動以模板產 `viewer.js`／`console.js`）；列表不顯示 icon。
 - **編輯（中）**：meta（label／icon／enabled）、params schema（integer／number／string／color／boolean／select／array）、`viewer.js`／`console.js` 代碼；code 區 tab 可切 `effects.json`（選定特效單項）／`viewer.js`／`console.js`。
-- **程式碼與檢查**：`viewer.js`／`console.js`／`effects.json` 編輯框含**即時語法高亮**（底層 `<pre>` 依 JS/JSON token 上色、表層 textarea 文字透明、`wrap=off` 水平捲動、Tab 鍵縮排、readonly 時淡色）；[暫存] staged、按 [保存至伺服器] 才寫入 server；編輯 `viewer.js`／`console.js` 編輯框即把三態指標轉「未保存變更」，未 [暫存] 的變更在切換特效／[重載]前彈 confirm 避免靜默捨棄、[重載]後刷新編輯框；[匯入]／[匯出] 標籤隨 tab（`effects.json`／`viewer.js`／`console.js`），匯入 .js／effects.json 後自動對該內容跑[檢查格式]；[檢查格式]（單檔）與 [檢查 3 檔]（effects.json＋viewer.js＋console.js）做輕量檢查（語法＋註冊＋結構）。
-- **即時預覽（右）**：canvas（800×450 邏輯座標、buffer 依 `devicePixelRatio` 放大使高 DPR 清晰）以 `Effects.createEffect`／`stepEffect` 渲染；選定生成點以**十字標記**顯示（點 canvas 設定、預設 50/50、[重設 50/50] 還原；**反縮放繪製**——canvas 被 CSS 拉伸為非 16:9 時標記仍以恆定 CSS px、圓點不變橢圓／十字臂等長）；**簡化 console 面板**（浮動 FAB 與面板皆 **clamp 至 canvas 大小內**（4 候選 下/上/右/左＋max-height 限 canvas 高、不超出邊界）、展開/收合；canvas 大小變化（.rsz 拖曳／視窗）**自動重 clamp**（`ResizeObserver`）；圓形特效鈕＋[參數]鈕仿 console、參數**橫式布局對齊 console**）——[開始預覽] 讀暫存/已存 console.js→特效 icon＋參數 `render`（**僅展示**、編輯器不讀回、預覽仍用 manifest 預設參數）、切換特效或 [重載] 清空；[開始預覽]／[清屏]（只清編輯器 canvas、不影響 viewer）／[測試特效]（以真實插件實際 smoke run）；狀態與結果顯示於預覽面板結果區（預設「操作結果：尚未執行」）。**預覽/測試安全（S3）**：插件碼以 `new Function` 於**當前頁 realm** 執行（非隔離沙箱），預覽/測試前對引用危險 API（`localStorage`／`document.cookie`／`fetch`／`eval` 等）者於結果區顯示**非阻斷「預覽預警」**（可存取頁面金鑰 `localStorage['rtx.editor.srvKey']`/cookie/網路；本地可信工具、請僅預覽可信代碼；server 端已存、非 staged 的 `[開始預覽]` viewer 經 `loadScript` 載入不掃）。
-- **儲存**：`PUT /api/editor/manifest`（`baseRev` 樂觀鎖、可 `deleteRemoved`）＋ `PUT /api/editor/effect/{id}/file`（插件檔）；修改前備份至 `effects/.backup/<timestamp>/`（保留最近 5 份）；舊 `baseRev` 回 `409`、獨立限頻（1/s）回 `429`、無效 manifest 回 `400` 並回滾、PUT 單檔／staged 檔案內容超 1MB 回 `413`。
+- **程式碼與檢查**：`viewer.js`／`console.js`／`effects.json` 編輯框含即時語法高亮；[暫存] staged、按 [保存至伺服器] 才寫入 server；未 [暫存] 的變更在切換特效／[重載]前彈 confirm 避免靜默捨棄、[重載]後刷新編輯框；[匯入]／[匯出] 標籤隨 tab，匯入後自動跑 [檢查格式]（單檔）與 [檢查 3 檔]（effects.json＋viewer.js＋console.js）。
+- **即時預覽（右）**：canvas 以 `Effects.createEffect`／`stepEffect` 渲染；選定生成點以十字標記顯示（點 canvas 設定、預設 50/50、[重設 50/50] 還原）；簡化 console 面板（FAB 與面板 clamp 在 canvas 內、canvas 大小變化自動重 clamp、參數橫式布局對齊 console）；[開始預覽] 讀暫存/已存 console.js 渲染特效 icon＋參數（僅展示）、切換特效或 [重載] 清空；[開始預覽]／[清屏]（只清編輯器 canvas、不影響 viewer）／[測試特效]（以真實插件實際 smoke run）；插件碼於當前頁 realm 執行（非隔離沙箱），引用危險 API（`localStorage`／cookie／`fetch`／`eval` 等）者於預覽前顯示非阻斷「預覽預警」。
+- **儲存**：`PUT /api/editor/manifest`（`baseRev` 樂觀鎖、可 `deleteRemoved`）＋ `PUT /api/editor/effect/{id}/file`（插件檔）；修改前備份至 `effects/.backup/<timestamp>/`（保留 5 份）；舊 `baseRev` 回 `409`、限頻回 `429`、無效 manifest 回 `400` 並回滾。
 - **zip 匯入／匯出**：[匯出 effects.zip]（完整 manifest）／[匯出所選 effects.zip]（子集，zip 內 `effects.json` 只含所選 effects）；[匯入 effects.zip]（≤10 MB、staged、按 [保存至伺服器] 落盤，缺的插件檔自動補模板）。
-- **金鑰與自動更新**：讀取端點公開、寫入端點需 `X-Access-Key`（首次輸入存 `localStorage`）；經 SSE `/api/stream` 接收 `manifest` 事件提示重載，變更狀態以三態指標顯示（已同步／未保存變更／保存中）。頂列連線 badge 顯示「連線中…」（載入／重載中）／「已連線 · vN」／「斷線」；SSE 斷流**不**影響連線顯示（icon/badge 跟隨 manifest、非 SSE）。
+- **金鑰與自動更新**：讀取端點公開、寫入端點需 `X-Access-Key`（首次輸入存 `localStorage`）；經 SSE `/api/stream` 接收 `manifest` 事件提示重載，變更狀態以 `#ed-dirty` 指標顯示（已同步／未暫存變更／未保存變更／保存中）；頂列連線 badge 顯示「連線中…」／「已連線 · vN」／「斷線」；SSE 斷流不影響連線顯示（icon/badge 跟隨 manifest、非 SSE）。
 
 ## 示範頁（examples，opt-in）
 
@@ -295,13 +295,13 @@ set SERVE_EXAMPLES=1 && python -m uvicorn server.main:app --port 8000
 | `GET /editor` | 特效編輯器頁面（`/editor/` 同） |
 | `GET /editor/app.js`、`/editor/style.css` | 編輯器資產 |
 | `GET /api/editor/manifest` | 目前 manifest 與 `rev`（讀取公開） |
-| `PUT /api/editor/manifest` | 寫入完整 manifest（`X-Access-Key`、可選 `baseRev`／`deleteRemoved`；version 必須為 2、舊 `baseRev` 回 409、限頻 1/s 回 429） |
+| `PUT /api/editor/manifest` | 寫入完整 manifest（`X-Access-Key`、可選 `baseRev`／`deleteRemoved`；舊 `baseRev` 回 409、限頻回 429） |
 | `DELETE /api/editor/effect/{effect_id}` | 從 manifest 移除特效（可選 `deleteFiles=true` 連同刪除插件目錄） |
 | `GET /api/editor/effect/{effect_id}/viewer.js`／`console.js` | 讀取特效插件檔（讀取公開） |
-| `PUT /api/editor/effect/{effect_id}/viewer.js`／`console.js` | 寫入特效插件檔（`content` 須為字串；`viewer.js` 不可空、`console.js` 可空＝該特效無 console 插件；需 key、限頻 1/s、回傳 warnings） |
-| `DELETE /api/editor/effect/{effect_id}/console.js` | 刪除 console 插件檔（需 key、限頻 1/s） |
-| `POST /api/editor/export` | 匯出 zip（body `{manifest, files, ids}`；`ids` 非空時為子集，`effects.json` 只含所選 effects 且帶 `currentEffects`／`alternateEffects`；檔案優先取 `files`（暫存）否則磁碟；讀取公開） |
-| `POST /api/editor/import` | 匯入 zip（multipart `file`；≤10 MB；需 key、限頻 1/s；帶 layout 鍵時**合併**回現有 layout，不整區取代） |
+| `PUT /api/editor/effect/{effect_id}/viewer.js`／`console.js` | 寫入特效插件檔（`viewer.js` 不可空、`console.js` 可空＝無 console 插件；需 key、限頻） |
+| `DELETE /api/editor/effect/{effect_id}/console.js` | 刪除 console 插件檔（需 key、限頻） |
+| `POST /api/editor/export` | 匯出 zip（`ids` 非空時為子集；檔案優先取暫存 `files` 否則磁碟；讀取公開） |
+| `POST /api/editor/import` | 匯入 zip（multipart `file`、≤10 MB；需 key、限頻；帶 layout 鍵時合併回現有 layout） |
 
 ## 測試
 
@@ -330,9 +330,9 @@ npx playwright test
 npm run test
 ```
 
-目前測試數量：pytest 156 項（`test_api` 61、`test_server_logging` 13、`test_editor_api` 82）、node 205 項（`test_console` 72、`test_effect_examples` 16、`test_effects` 19、`test_effect_catalog` 2、`test_editor` 96）、Playwright E2E 74 項（`tests/e2e/editor.spec.js` 46 項）。
+目前測試數量：pytest 159 項（`test_api` 61、`test_server_logging` 13、`test_editor_api` 85）、node 237 項（`test_console` 72、`test_effect_examples` 16、`test_effects` 19、`test_effect_catalog` 2、`test_editor` 128）、Playwright E2E 87 項（`tests/e2e/editor.spec.js` 59 項）。
 
-Playwright E2E 會自動啟動 server（port `8123`），並使用 `tests/fixtures/effects.json` 作為 manifest；webServer 先經 `tests/e2e/pre-server-copy.mjs` 把 `tests/fixtures/` 的 4 特效（particle／ripple／firework／text）複製到隔離的 `tmp/e2e-effects/`，並以 `RTX_EFFECTS_DIR` 指向該目錄（`tests/e2e/global-teardown.js` 測試後清理，故 E2E 全程不碰正式 `effects/`、只動 `tmp/` 與 `tests/fixtures`）；uvicorn 的 stdout/stderr 重定向至 gitignored `e2e-server.log`（測試輸出不再混入 server log、失敗時可查該檔含 app log＋uvicorn access＋crash traceback），因此預設不會把新特效納入測試。`tests/e2e/editor.spec.js` 使用同一測試 server 與 fixture manifest（部分用例經 `tests/e2e/helpers.js` 的 snapshot/restore 暫時改寫 fixture、結尾還原），驗證 `/editor` 頁面、manifest 載入／重載／SSE、meta/params 編輯保存與 409 衝突、批次操作、新增特效（effect_id 欄位：預設流水號 `effect-<N>`／`新特效 <N>`、僅新增可改／既有只讀、[暫存] re-key＋effects.json 預覽顯示 effect_id）、zip 匯入匯出（含單選子集 zip 匯出＋匯入 round-trip）與 console 匯入匯出、代碼編輯、即時預覽、[開始預覽]／[清屏]／[檢查此檔]／[暫存]／匯入匯出 等狀態與結果訊息（皆顯示於預覽面板結果區 `#ed-ops-result`、預設「操作結果：尚未執行」）、[測試特效]（真實插件實際運行、結果顯示於同一結果區）與「單個特效預覽」以真實特效渲染到 canvas 的 vm smoke-run（由 `tests/test_editor.mjs` 與 `tests/test_editor_api.py` 覆蓋）。`tests/e2e/reload-manifest.spec.js` 會另啟獨立 server 與 temp manifest，驗證 viewer 自動更新與 console 手動重載／重新整理。`tests/e2e/multi-console-reload.spec.js` 會另啟兩個獨立 server、temp manifest 與不同 `ACCESS_KEY`，驗證不同 server URL / key 的多 Console 端各自重載、被移除 effect 的 selected fallback，且互不影響。
+Playwright E2E 會自動啟動 server（port `8123`）；webServer 先經 `tests/e2e/pre-server-copy.mjs` 把 `tests/fixtures/` 的 4 特效複製到隔離的 `tmp/e2e-effects/`，並以 `RTX_EFFECTS_DIR` 指向該目錄（`tests/e2e/global-teardown.js` 測試後清理，E2E 全程不碰正式 `effects/`）；uvicorn stdout/stderr 重定向至 gitignored `e2e-server.log`。`tests/e2e/editor.spec.js`（59 項）驗證 `/editor` 全功能：manifest 載入／重載／SSE、meta/params 編輯保存與 409、批次操作、新增特效（effect_id 欄位）、zip 匯入匯出、代碼編輯、即時預覽與 timeline、[測試特效]、簡化 console 面板、格式檢查與狀態指標。其餘 spec 各管一題：`fx-layout`（console 雙區拖曳／FLIP 動畫／localStorage）、`fx-drag-trigger-distance`（8 方向拖曳觸發距離）、`fx-button-counts`（console 按鈕數）、`reload-manifest`（viewer 自動更新／console 手動重載）、`multi-console-reload`（多 console 獨立重載）、`effect-params`（參數輸入送 POST body）、`console-viewer-flow`（console→viewer 流程）、`examples-smoke`／`examples-theme-toggle`（examples 頁 smoke 與主題切換）。
 
 ## 文件
 
