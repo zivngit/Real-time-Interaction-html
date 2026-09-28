@@ -119,5 +119,6 @@
 - [x] params 卡 type 為 color 時 default 用原生顏色選取器（7j）：color→input type=color（非法值→#000000）、其他型別為文字；v1 唯讀、v2 可編輯（version 7i→7j、純 editor 前端、2026-09-27）
 - [x] params 卡 type 為 array 時 default 用可編輯子項列＋[+ item] 按鈕（7k）：每個 default 值一行＋✕ 刪行、[+ item] 加空行、值依 items.type 轉回（version 7j→7k、純 editor 前端、2026-09-27）
 - [x] examples 索引頁加入 effects 編輯器連結：`examples/index.html` 示範頁清單下新增指向 `/editor` 的連結（簡述編輯器功能、註明不需 `SERVE_EXAMPLES`）；`tests/test_api.py` `test_examples_enabled_when_serve_examples_set` 補 `href="/editor"` 斷言、`tests/e2e/examples-smoke.spec.js` 索引測試補 `/editor` 連結可見斷言（2026-09-20）
+- [x] effects-editor 分支統整合併至 master：169 個原始 commit 收錄為單一 feat commit（統整 067–149）＋單一 docs commit＋2 份報告 commit（067~149、150），原歷史保留於 `effects-editor-plan` 分支備份、`master` 快進合併（2026-09-28）
 - [ ] 重評 effects-tag 設計（effects 編輯器落地後：多特效同時啟用/禁用、場景組、與 category 之關係；編輯器已移除 category 編輯欄位（5v，修正 B1 靜默丟資料），重評須決定 category/tag 資料模型；`feat/new-effects` 已達 42 特效為規模依據）
 - [ ] effects 編輯器後續小項：`POST /api/editor/import` 缺 `file` 欄位回 422 先於 401（FastAPI body 驗證先於 auth）；「zip 清目錄後匯入回補」情境建議人工瀏覽器確認（2026-09-20 Phase 4 核對提出；原「发送到 viewer 後 viewer 渲染」情境隨 [发送到 viewer] 按鈕移除而作廢）
