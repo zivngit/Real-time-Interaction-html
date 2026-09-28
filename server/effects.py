@@ -7,7 +7,7 @@ import threading
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-EFFECTS_DIR = ROOT / "effects"
+EFFECTS_DIR = Path(os.environ.get("RTX_EFFECTS_DIR", str(ROOT / "effects")))
 MANIFEST_PATH = Path(os.environ.get("RTX_EFFECTS_MANIFEST", str(EFFECTS_DIR / "effects.json")))
 
 EFFECT_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")

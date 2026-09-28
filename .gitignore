@@ -19,4 +19,12 @@ node_modules/
 
 # Server log（RotatingFileHandler 備份檔 .1~.3）
 /server.log*
+# E2E webServer（uvicorn）stdout/stderr 重定向
+/e2e-server.log
 /playwright/.auth/
+
+# effects 編輯器 manifest 備份
+/effects/.backup/
+
+# E2E 隔離特效目錄（global-setup 自 effects/ 複製 fixture 引用的 4 個特效）
+/tmp/

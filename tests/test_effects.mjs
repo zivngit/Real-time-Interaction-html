@@ -18,7 +18,7 @@ function runPlugin(file, sandboxOverrides = {}) {
 }
 
 test("viewer plugins no-op when window.Effects is missing", () => {
-  const src = readFileSync(join(root, "effects", "particle", "viewer.js"), "utf8");
+  const src = readFileSync(join(root, "tests", "fixtures", "particle", "viewer.js"), "utf8");
   const sandbox = { console };
   vm.createContext(sandbox);
   vm.runInContext(src, sandbox);
@@ -27,7 +27,7 @@ test("viewer plugins no-op when window.Effects is missing", () => {
 
 test("viewer plugins register all 4 effects", () => {
   for (const id of ["particle", "ripple", "firework", "text"]) {
-    runPlugin(join("effects", id, "viewer.js"));
+    runPlugin(join("tests", "fixtures", id, "viewer.js"));
   }
   assert.deepEqual(Object.keys(Effects.registry).sort(), ["firework", "particle", "ripple", "text"]);
   for (const id of Object.keys(Effects.registry)) {
@@ -169,6 +169,35 @@ test("Effects.reset clears registry but keeps registry identity", () => {
   assert.equal(Effects.registry["reset-test"], undefined);
   assert.equal(Effects.registry, registryBefore);
   for (const id of ["particle", "ripple", "firework", "text"]) {
-    runPlugin(join("effects", id, "viewer.js"));
+    runPlugin(join("tests", "fixtures", id, "viewer.js"));
   }
+});
+
+test("editor viewer template registers a working effect", () => {
+  const editorSrc = readFileSync(join(root, "server", "editor.py"), "utf8");
+  const match = editorSrc.match(/VIEWER_TEMPLATE = """([\s\S]*?)"""/);
+  assert.ok(match, "VIEWER_TEMPLATE not found in server/editor.py");
+  Effects.reset();
+  const sandbox = { window: { Effects: Effects }, console };
+  vm.createContext(sandbox);
+  vm.runInContext(match[1].replaceAll("__ID__", "tpl-fx"), sandbox);
+  assert.equal(typeof Effects.registry["tpl-fx"], "function");
+  const e = createEffect("tpl-fx", 10, 10, { duration: 400 });
+  assert.equal(e.done(), false);
+  const ctx = {
+    globalAlpha: 0,
+    fillStyle: null,
+    rect: false,
+    save() {},
+    restore() {},
+    fillRect() {
+      this.rect = true;
+    },
+  };
+  Effects.stepEffect(e, 200);
+  e.draw(ctx);
+  assert.equal(ctx.rect, true);
+  assert.ok(ctx.globalAlpha > 0 && ctx.globalAlpha < 1);
+  Effects.stepEffect(e, 400);
+  assert.equal(e.done(), true);
 });

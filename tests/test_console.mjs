@@ -1421,7 +1421,7 @@ test("invalid plugin iconID falls back to built-in fallback icon without icon ta
 });
 
 test("console plugin source no-ops without RTX_EFFECT_CONSOLE", async () => {
-  const pluginSrc = readFileSync(join(root, "effects", "particle", "console.js"), "utf8");
+  const pluginSrc = readFileSync(join(root, "tests", "fixtures", "particle", "console.js"), "utf8");
   const sandbox = { window: {}, console: { info() {}, warn() {} } };
   vm.createContext(sandbox);
   vm.runInContext(pluginSrc, sandbox);
@@ -1429,7 +1429,7 @@ test("console plugin source no-ops without RTX_EFFECT_CONSOLE", async () => {
 });
 
 test("console plugin source registers into existing RTX_EFFECT_CONSOLE", async () => {
-  const pluginSrc = readFileSync(join(root, "effects", "particle", "console.js"), "utf8");
+  const pluginSrc = readFileSync(join(root, "tests", "fixtures", "particle", "console.js"), "utf8");
   const registry = { registry: {} };
   registry.register = (t, p) => {
     registry.registry[t] = p;

@@ -2,6 +2,23 @@
 
 本專案的特效由專案根目錄的 `effects/effects.json`（manifest）集中驅動。正式新增一個特效時，只需修改該檔案並建立對應插件檔案，`server/`、`viewer/`、`console/` 的程式碼不需要修改。
 
+## 用編輯器（推薦）
+
+server 內建視覺化特效編輯器：`http://<server-host>:8000/editor/`。無須手動編輯 JSON，瀏覽器即可完成（重點；各功能詳細行為見 README「特效編輯器」節）：
+
+- **編輯**：改 manifest／meta（label、icon、enabled）／params schema；左欄特效列表拖曳排序、批次啟用／停用／移區／刪除、新增特效（server 自動以模板產 `viewer.js`／`console.js`）。category 為 console 分組欄位，現不在編輯器內編輯。
+- **程式碼**：直接編輯 `viewer.js`／`console.js`；[暫存] staged、按 [保存至伺服器] 才寫入（回傳 lint 級 warnings）；[匯入]／[匯出] 標籤隨 tab（`effects.json`／`viewer.js`／`console.js`）；[檢查格式]（單檔）／[檢查 3 檔] 輕量檢查（語法＋註冊＋結構）。
+- **預覽與測試**：右欄 canvas 即時預覽（選定生成點以十字標記顯示、點 canvas 設定／[重設 50/50] 還原）、[清屏]（只清編輯器 canvas、不影響 viewer）、[測試特效]（真實插件 smoke run）；狀態與結果顯示於預覽面板結果區（預設「操作結果：尚未執行」）。
+- **zip 匯入／匯出**：整包（effects.zip）或所選子集（effect.zip）匯入匯出；匯入 ≤10 MB、staged、按 [保存至伺服器] 落盤。
+
+使用注意：
+
+- 寫入端點需 `X-Access-Key`（首次輸入存 `localStorage`，與 server `ACCESS_KEY` 相同）；未設 `ACCESS_KEY` 時全開放。
+- 寫入受獨立限頻（1/s，連續快速儲存回 `429`）；以舊 `baseRev` 儲存回 `409`（他人已改），編輯器會提示並可重載。
+- 讀取端點（`GET /api/effects`、`GET /api/editor/manifest`、插件檔、`POST /api/editor/export` 等）不需金鑰。
+
+手動方式仍可照舊：直接改 `effects/effects.json` 與插件檔案後呼叫 `POST /api/effects/reload`（需 `X-Access-Key`）。以下各節為手動方式說明。
+
 ## 1. 需要修改的檔案
 
 | 檔案 | 必要 | 說明 |

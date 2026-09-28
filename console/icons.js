@@ -14,6 +14,10 @@
     conn: "<svg viewBox='0 0 24 24' aria-hidden='true'><rect x='4' y='5' width='16' height='6' rx='1.5'/><rect x='4' y='13' width='16' height='6' rx='1.5'/><circle cx='8' cy='8' r='1'/><circle cx='8' cy='16' r='1'/></svg>",
     layout: "<svg viewBox='0 0 24 24' aria-hidden='true'><rect x='4' y='4' width='7' height='7' rx='1.5'/><rect x='13' y='4' width='7' height='7' rx='1.5'/><rect x='4' y='13' width='7' height='7' rx='1.5'/><rect x='13' y='13' width='7' height='7' rx='1.5'/></svg>",
     reload: "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M20 12a8 8 0 1 1-2.35-5.65'/><polyline points='20 4 20 8 16 8'/></svg>",
-    clear: "<svg viewBox='0 0 24 24' aria-hidden='true'><line x1='5' y1='7' x2='19' y2='7'/><line x1='9' y1='7' x2='9' y2='5'/><line x1='15' y1='7' x2='15' y2='5'/><line x1='9' y1='5' x2='15' y2='5'/><line x1='6' y1='7' x2='7' y2='19'/><line x1='18' y1='7' x2='17' y2='19'/><line x1='7' y1='19' x2='17' y2='19'/></svg>"
+    clear: "<svg viewBox='0 0 24 24' aria-hidden='true'><line x1='5' y1='7' x2='19' y2='7'/><line x1='9' y1='7' x2='9' y2='5'/><line x1='15' y1='7' x2='15' y2='5'/><line x1='9' y1='5' x2='15' y2='5'/><line x1='6' y1='7' x2='7' y2='19'/><line x1='18' y1='7' x2='17' y2='19'/><line x1='7' y1='19' x2='17' y2='19'/></svg>",
+    play: "<svg viewBox='0 0 24 24' aria-hidden='true'><polygon points='8 5 19 12 8 19'/></svg>",
+    pause: "<svg viewBox='0 0 24 24' aria-hidden='true'><line x1='9' y1='5' x2='9' y2='19'/><line x1='15' y1='5' x2='15' y2='19'/></svg>",
+    replay: "<svg viewBox='0 0 24 24' aria-hidden='true'><line x1='6' y1='5' x2='6' y2='19'/><polygon points='20 5 20 19 9 12'/></svg>",
+    end: "<svg viewBox='0 0 24 24' aria-hidden='true'><line x1='19' y1='5' x2='19' y2='19'/><polygon points='5 5 5 19 16 12'/></svg>"
   };
 })();

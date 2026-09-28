@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Effects Editor</title>
+<link rel="stylesheet" href="/editor/style.css">
+</head>
+<body>
+<div id="rtx-editor">
+  <header class="topbar">
+    <div class="brand">Effects Editor</div>
+    <span class="badge" id="ed-badge">連線中…</span>
+    <div class="status">
+      <span class="chip" id="ed-chip-version">version 2</span>
+      <span class="chip" id="ed-chip-rev">rev ——（base）</span>
+      <span class="chip" id="ed-chip-count">0 / 0 特效啟用</span>
+    </div>
+    <div class="conn">
+      <span class="ui-ico" id="ed-conn" data-ui-icon="conn" title="連線狀態"></span>
+      <input type="password" class="srv-key" id="ed-srv-key" placeholder="存取金鑰" autocomplete="off">
+      <button class="btn small" id="ed-reload-btn"><span class="ui-ico" data-ui-icon="reload"></span>重載</button>
+    </div>
+    <button class="btn primary" id="ed-save-btn">保存至伺服器</button>
+  </header>
+
+  <div class="main">
+    <section class="panel" id="ed-list-panel">
+      <div class="p-head">
+        <h2>特效列表</h2>
+        <span class="grow"></span>
+        <div class="dd">
+          <button class="btn small" id="ed-export-btn">匯出 ▾</button>
+          <div class="dd-menu">
+            <div class="dd-item" id="ed-export-all">匯出 effects.zip</div>
+            <div class="dd-item" id="ed-export-sel">匯出所選 effects.zip</div>
+          </div>
+        </div>
+        <div class="dd">
+          <button class="btn small primary" id="ed-add-btn">＋ 新增特效 ▾</button>
+          <div class="dd-menu">
+            <div class="dd-item" id="ed-add-new">新增特效</div>
+            <div class="dd-item" id="ed-import-effects">匯入 effects.zip</div>
+          </div>
+        </div>
+      </div>
+      <div class="batch-bar" id="ed-batch-bar">
+        <span class="batch-count" id="ed-batch-count"></span>
+        <div class="batch-btns">
+          <button class="btn small" id="ed-batch-enable" disabled>啟用</button>
+          <button class="btn small" id="ed-batch-disable" disabled>停用</button>
+          <button class="btn small" id="ed-batch-to-cur" disabled>移入主區</button>
+          <button class="btn small" id="ed-batch-to-alt" disabled>移入次區</button>
+        </div>
+      </div>
+      <div class="fx-list" id="ed-fx-list">
+        <div class="zone-group cur" id="ed-zone-cur" data-zone="cur">
+          <div class="zone-head cur" id="ed-zone-cur-head">主區 · currentEffects（0）</div>
+        </div>
+        <div class="zone-group" id="ed-zone-alt" data-zone="alt">
+          <div class="zone-head" id="ed-zone-alt-head">次區 · alternateEffects（0）</div>
+        </div>
+        <div class="zone-group pending" id="ed-zone-pending" data-zone="pending">
+          <div class="zone-head pending" id="ed-zone-pending-head">待刪除 / 已刪除（0）</div>
+        </div>
+        <div class="hint">拖曳排序；拖曳至另一組＝改分區；所有操作為暫存（staged），按[保存至伺服器]才寫入 server</div>
+      </div>
+      <input type="file" id="ed-file-import-effects" accept=".zip" hidden>
+    </section>
+
+    <div class="rsz" data-rsz="1"></div>
+    <div class="left-col">
+      <section class="panel" id="ed-manifest-panel">
+        <div class="p-head">
+          <h2>manifest 編輯</h2>
+          <span class="grow"></span>
+          <span class="sync" id="ed-dirty" data-state="clean">已同步</span>
+        </div>
+        <div class="editor-body" id="ed-editor-body">
+          <div class="section-title" id="ed-meta-title" style="margin-top:0">Meta · ——</div>
+          <div class="form-grid" id="ed-meta-form">
+            <div class="field"><label for="ed-meta-id">effect_id</label><input type="text" id="ed-meta-id" placeholder="" spellcheck="false"></div>
+            <div class="field"><label for="ed-meta-label">label</label><input type="text" id="ed-meta-label" placeholder=""></div>
+            <div class="field"><label for="ed-meta-icon">icon</label><input type="text" id="ed-meta-icon" placeholder=""></div>
+            <div class="check-row">
+              <label class="switch"><input type="checkbox" id="chk-enabled" checked><span class="slider"></span></label>
+              <span>enabled（啟用）</span>
+            </div>
+          </div>
+          <div class="section-title" id="ed-params-head">
+            <span id="ed-params-title"><span class="ui-ico" data-ui-icon="params"></span>Params schema</span>
+            <span class="grow"></span>
+            <span class="hint">拖曳列排序</span>
+            <button class="btn small" id="ed-add-param">＋ 新增參數</button>
+          </div>
+          <div class="p-rows" id="ed-p-rows"></div>
+        </div>
+      </section>
+      <section class="panel" id="ed-code-panel">
+        <div class="tabs" id="ed-tabs">
+          <div class="tab active" data-tab="manifest">effects.json</div>
+          <div class="tab" data-tab="console">console.js</div>
+          <div class="tab" data-tab="viewer">viewer.js</div>
+          <span class="grow"></span>
+          <span class="hint tabs-hint" id="ed-tabs-hint">——</span>
+        </div>
+        <div class="code-wrap">
+          <div class="code-gutter" id="ed-code-gutter"><div class="code-gutter-inner" id="ed-code-gutter-inner">1</div></div>
+          <div class="code-area">
+            <pre class="code-hl" id="ed-code-highlight" aria-hidden="true"><code id="ed-code-highlight-code"></code></pre>
+            <textarea class="code" id="ed-code" spellcheck="false" wrap="off"></textarea>
+          </div>
+        </div>
+        <div class="actions">
+          <div class="act-group">
+            <button class="btn small" id="ed-import-file">匯入 effects.json</button>
+            <button class="btn small" id="ed-export-file">匯出 effects.json</button>
+          </div>
+          <div class="act-group">
+            <button class="btn small" id="ed-check-file" title="檢查目前分頁單一檔案（effects.json／viewer.js／console.js）格式">檢查此檔</button>
+            <button class="btn small" id="ed-check-all" title="檢查選定特效的 3 個檔案（effects.json＋viewer.js＋console.js）格式">檢查 3 檔</button>
+          </div>
+          <span class="grow"></span>
+          <button class="btn small primary" id="ed-save-file">暫存</button>
+          <input type="file" id="ed-file-import-file" accept=".json" hidden>
+        </div>
+      </section>
+    </div>
+    <div class="rsz" data-rsz="2"></div>
+
+    <section class="panel" id="ed-preview-panel">
+      <div class="p-head">
+        <h2>預覽（單個特效）</h2>
+        <span class="grow"></span>
+        <span class="hint" id="ed-preview-hint">——（選定）</span>
+      </div>
+      <div class="preview-body" id="ed-preview-body">
+        <div class="preview-box" id="ed-preview-box">
+          <span class="plabel" id="ed-preview-label">——（選定）· 800×450</span>
+          <canvas id="ed-preview-canvas" width="800" height="450" title="點按設定選定座標（十字標記顯示、預設 50/50）；開始預覽用此座標"></canvas>
+        </div>
+        <div class="actions">
+          <div class="act-group">
+            <button class="btn small primary" id="ed-preview-start">開始預覽</button>
+            <span class="transport">
+              <button class="btn small icon-btn" id="ed-preview-replay" title="重播預覽：時間歸零、保持目前速率（重用已載入插件、不重請求 .js）" aria-label="重播" disabled><span class="ui-ico" data-ui-icon="replay"></span></button>
+              <button class="btn small icon-btn" id="ed-preview-pause" title="暫停預覽（暫停時長不計入特效時間）" aria-label="暫停" disabled><span class="ui-ico" data-ui-icon="pause"></span></button>
+              <button class="btn small icon-btn" id="ed-preview-clear" title="結束預覽並清除畫面" aria-label="清屏" disabled><span class="ui-ico" data-ui-icon="end"></span></button>
+            </span>
+          </div>
+          <div class="act-group">
+            <label class="pv-rate" for="ed-preview-rate">速率</label>
+            <input type="range" id="ed-preview-rate" min="0.25" max="4" step="0.25" value="1" aria-label="預覽速率">
+            <span class="pv-rate-val" id="ed-preview-rate-val">1×</span>
+          </div>
+          <span class="grow"></span>
+          <div class="act-group">
+            <button class="btn small" id="ed-preview-test" title="執行單個特效測試：以真實插件實際運行選定特效、驗證可渲染與完成（結果顯示於預覽面板下方結果區）">測試特效</button>
+            <button class="btn small" id="ed-preview-reset" title="重設選定座標為 50/50（預設）">重設 50/50</button>
+          </div>
+        </div>
+        <div class="ops-result" id="ed-ops-result">操作結果：尚未執行</div>
+        <!-- U15 簡化 console：FAB 展開/收合＋可拖曳（限 preview 區）、特效 icon＋參數僅展示 -->
+        <button type="button" id="ed-mini-fab" class="mini-fab" title="簡化 console：icon＋參數僅展示（拖曳移動、點按展開/收合）" aria-expanded="false" aria-controls="ed-mini-console"><span class="ui-ico" data-ui-icon="params"></span></button>
+        <div id="ed-mini-console" class="mini-console" role="dialog" aria-label="簡化 console（僅展示）" aria-hidden="true">
+          <div class="mini-head">
+            <button type="button" id="ed-mini-fx" class="mini-fx" title="目前選定特效（僅展示）">
+              <span id="ed-mini-fx-icon" class="mini-fx-icon"></span>
+            </button>
+            <span id="ed-mini-fx-name" class="mini-fx-name"></span>
+            <span class="grow"></span>
+            <button type="button" id="ed-mini-params" class="mini-params-btn" title="顯示/隱藏參數（僅展示）" aria-label="參數" aria-expanded="false" aria-controls="ed-mini-params-body"><span class="ui-ico" data-ui-icon="params"></span></button>
+          </div>
+          <div id="ed-mini-params-body" class="mini-params"></div>
+          <div class="mini-hint">僅展示：同步所選特效的預覽參數（未存變更亦反映）；取自 console.js render</div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+<script src="/console/icons.js"></script>
+<script src="/editor/app.js"></script>
+</body>
+</html>

@@ -9,6 +9,7 @@ test("examples index lists embed pages", async ({ page }) => {
   await expect(page.getByRole("link", { name: "embed-viewer.html" })).toBeVisible();
   await expect(page.getByRole("link", { name: "embed-console.html" })).toBeVisible();
   await expect(page.getByRole("link", { name: "embed-both.html" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "/editor" })).toBeVisible();
   expect(errors).toHaveLength(0);
 });
 

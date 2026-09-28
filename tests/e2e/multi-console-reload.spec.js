@@ -89,6 +89,7 @@ async function startServer(name, key, label) {
           ...process.env,
           ACCESS_KEY: key,
           RTX_EFFECTS_MANIFEST: manifestPath,
+          RTX_EFFECTS_DIR: path.join(ROOT, "tests", "fixtures"),
           SERVE_EXAMPLES: "1",
         },
         stdio: ["ignore", "pipe", "pipe"],

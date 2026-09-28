@@ -16,6 +16,7 @@ configure_logging()
 
 import server.effects as effects  # noqa: E402
 from server.effects import EFFECTS, ManifestError, reload_effects  # noqa: E402
+from server.editor import router as editor_router  # noqa: E402
 from server.params import normalize_params
 from server.relay import RateLimiter, add_subscriber, broadcast, event_stream, subscriber_count
 from server.security import check_key
@@ -53,6 +54,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(editor_router)
 
 rate_limiter = RateLimiter()
 reload_limiter = RateLimiter()

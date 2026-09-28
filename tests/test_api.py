@@ -15,6 +15,7 @@ import uvicorn
 from fastapi.testclient import TestClient
 
 os.environ["RTX_EFFECTS_MANIFEST"] = str(Path(__file__).resolve().parent / "fixtures" / "effects.json")
+os.environ["RTX_EFFECTS_DIR"] = str(Path(__file__).resolve().parent / "fixtures")
 
 import server.effects
 import server.main as m
@@ -688,6 +689,7 @@ def test_examples_enabled_when_serve_examples_set(client, monkeypatch):
     assert r.headers["cache-control"] == "no-store"
     for name in ("embed-viewer.html", "embed-console.html", "embed-both.html"):
         assert name in r.text
+    assert 'href="/editor"' in r.text
     assert "/viewer/index.html" not in r.text
     assert "/console/index.html" not in r.text
     for theme_asset in ("/examples/theme.css", "/examples/theme.js"):
