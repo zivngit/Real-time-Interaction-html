@@ -164,6 +164,7 @@ test("multiple consoles with different server URL and key reload independently w
     await expect(consoleA.locator("#rtx-srv-url")).toHaveValue(baseA);
     await expect(consoleA.locator("#rtx-srv-key")).toHaveValue(KEY_A);
     await expect(consoleA.locator("#rtx-fx-particle")).toHaveAttribute("aria-label", INITIAL_A);
+    await expect(consoleA.locator("script[data-rtx-effect]")).toHaveCount(3);
     await ensurePanelOpen(consoleA);
     await consoleA.locator(`#rtx-fx-${REMOVED_A}`).click();
     await expect(consoleA.locator(`#rtx-fx-${REMOVED_A}`)).toHaveClass(/selected/);
@@ -179,6 +180,7 @@ test("multiple consoles with different server URL and key reload independently w
     await expect(consoleB.locator("#rtx-srv-url")).toHaveValue(baseB);
     await expect(consoleB.locator("#rtx-srv-key")).toHaveValue(KEY_B);
     await expect(consoleB.locator("#rtx-fx-particle")).toHaveAttribute("aria-label", INITIAL_B);
+    await expect(consoleB.locator("script[data-rtx-effect]")).toHaveCount(3);
     await ensurePanelOpen(consoleB);
     await consoleB.locator(`#rtx-fx-${REMOVED_B}`).click();
     await expect(consoleB.locator(`#rtx-fx-${REMOVED_B}`)).toHaveClass(/selected/);
@@ -193,6 +195,7 @@ test("multiple consoles with different server URL and key reload independently w
     await consoleA.locator("#rtx-reload-btn").click();
     await expect(consoleA.locator("#rtx-fx-particle")).toHaveAttribute("aria-label", RELOADED_A, { timeout: 10000 });
     await expect(consoleA.locator(`#rtx-fx-${REMOVED_A}`)).toHaveCount(0);
+    await expect(consoleA.locator("script[data-rtx-effect]")).toHaveCount(2);
     await expect(consoleA.locator("#rtx-fx-particle")).toHaveClass(/selected/);
     await expect(consoleB.locator("#rtx-fx-particle")).toHaveAttribute("aria-label", INITIAL_B);
     await expect(consoleB.locator(`#rtx-fx-${REMOVED_B}`)).toHaveClass(/selected/);
@@ -207,6 +210,7 @@ test("multiple consoles with different server URL and key reload independently w
     await consoleB.locator("#rtx-reload-btn").click();
     await expect(consoleB.locator("#rtx-fx-particle")).toHaveAttribute("aria-label", RELOADED_B, { timeout: 10000 });
     await expect(consoleB.locator(`#rtx-fx-${REMOVED_B}`)).toHaveCount(0);
+    await expect(consoleB.locator("script[data-rtx-effect]")).toHaveCount(3);
     await expect(consoleB.locator("#rtx-fx-particle")).toHaveClass(/selected/);
     await expect(consoleA.locator("#rtx-fx-particle")).toHaveAttribute("aria-label", RELOADED_A);
     await expect(consoleA.locator(`#rtx-fx-${REMOVED_A}`)).toHaveCount(0);

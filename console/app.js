@@ -776,14 +776,31 @@
     return out;
   }
 
-  function loadScriptTag(url) {
+  var inflightConsolePlugins = {};
+
+  function pruneConsolePlugins() {
+    var nodes = document.head.querySelectorAll("script[data-rtx-effect]");
+    for (var i = 0; i < nodes.length; i++) {
+      var id = nodes[i].getAttribute("data-rtx-effect");
+      if (nodes[i] !== inflightConsolePlugins[id]) nodes[i].remove();
+    }
+  }
+
+  function loadScriptTag(url, effectId, rev) {
     return new Promise(function (resolve) {
       var s = document.createElement("script");
       s.src = url;
+      if (effectId) {
+        s.setAttribute("data-rtx-effect", effectId);
+        s.setAttribute("data-rtx-rev", rev || "");
+        inflightConsolePlugins[effectId] = s;
+      }
       s.onload = function () {
+        if (effectId && inflightConsolePlugins[effectId] === s) delete inflightConsolePlugins[effectId];
         resolve(true);
       };
       s.onerror = function () {
+        if (effectId && inflightConsolePlugins[effectId] === s) delete inflightConsolePlugins[effectId];
         resolve(false);
       };
       document.head.appendChild(s);
@@ -791,13 +808,14 @@
   }
 
   function loadConsolePlugins(meta, rev) {
+    pruneConsolePlugins();
     var jobs = [];
     Object.keys(meta).forEach(function (type) {
       var url = meta[type] && meta[type].consoleUrl;
       if (!url) return;
       var suffix = rev ? "?v=" + encodeURIComponent(rev) : "";
       jobs.push(
-        loadScriptTag(srvUrl + url + suffix).then(function (ok) {
+        loadScriptTag(srvUrl + url + suffix, type, rev).then(function (ok) {
           if (!ok) console.warn("[control] console 插件載入失敗，使用 schema 渲染", srvUrl + url + suffix);
         })
       );

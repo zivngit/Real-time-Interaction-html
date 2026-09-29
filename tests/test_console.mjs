@@ -153,6 +153,12 @@ async function makeEnv(opts = {}) {
       el._attrs[k] = String(v);
     };
     el.getAttribute = (k) => (k in el._attrs ? el._attrs[k] : null);
+    el.remove = () => {
+      if (el._parent && el._parent._children.includes(el)) {
+        el._parent._children.splice(el._parent._children.indexOf(el), 1);
+      }
+      el._parent = null;
+    };
     el.appendChild = (c) => {
       if (c._parent && c._parent._children.includes(c)) {
         c._parent._children.splice(c._parent._children.indexOf(c), 1);
@@ -232,6 +238,12 @@ async function makeEnv(opts = {}) {
     }
     return result;
   };
+
+  head.querySelectorAll = (sel) =>
+    head._children.filter((c) => {
+      const m = /^([a-zA-Z][\w-]*)\[([\w-]+)\]$/.exec(sel || "");
+      return !!(m && c.tagName === m[1] && m[2] in c._attrs);
+    });
 
   const document = {
     head,
@@ -1262,6 +1274,27 @@ test("manual reload button posts reload and applies changed manifest", async () 
   assert.ok(!fxButtons._children.some((c) => c._id === "rtx-fx-firework"));
   assert.ok(fxButtons._children.some((c) => c._id === "rtx-fx-particle"));
   assert.ok(env.scriptLoads[env.scriptLoads.length - 1].includes("?v=rev-2"));
+});
+
+test("manual reload prunes stale console plugin script nodes", async () => {
+  const env = await makeEnv({
+    effectsJson: { effects: DEFAULT_EFFECTS },
+    reloadJson: { ok: true, changed: true, rev: "rev-2", effects: ["particle", "text"] },
+  });
+  assert.equal(env.head.querySelectorAll("script[data-rtx-effect]").length, 3);
+  const reloaded = {
+    particle: DEFAULT_EFFECTS.particle,
+    text: DEFAULT_EFFECTS.text,
+  };
+  env.setEffectsJson({ rev: "rev-2", effects: reloaded });
+  env.node("rtx-reload-btn")._fire("click");
+  await new Promise((r) => setTimeout(r, 50));
+  const nodes = env.head.querySelectorAll("script[data-rtx-effect]");
+  assert.equal(nodes.length, 2);
+  nodes.forEach((s) => {
+    assert.notEqual(s.getAttribute("data-rtx-effect"), "ripple");
+    assert.equal(s.getAttribute("data-rtx-rev"), "rev-2");
+  });
 });
 
 test("console plugin load failure keeps schema rendering", async () => {
