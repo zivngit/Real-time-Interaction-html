@@ -122,3 +122,5 @@
 - [x] effects-editor 分支統整合併至 master：169 個原始 commit 收錄為單一 feat commit（統整 067–149）＋單一 docs commit＋2 份報告 commit（067~149、150），原歷史保留於 `effects-editor-plan` 分支備份、`master` 快進合併（2026-09-28）
 - [ ] 重評 effects-tag 設計（effects 編輯器落地後：多特效同時啟用/禁用、場景組、與 category 之關係；編輯器已移除 category 編輯欄位（5v，修正 B1 靜默丟資料），重評須決定 category/tag 資料模型；`feat/new-effects` 已達 42 特效為規模依據）
 - [ ] effects 編輯器後續小項：`POST /api/editor/import` 缺 `file` 欄位回 422 先於 401（FastAPI body 驗證先於 auth）；「zip 清目錄後匯入回補」情境建議人工瀏覽器確認（2026-09-20 Phase 4 核對提出；原「发送到 viewer 後 viewer 渲染」情境隨 [发送到 viewer] 按鈕移除而作廢）
+- [x] 前端記憶體治理 Phase 1（viewer，S1）：viewer 插件 `<script>` 注入帶 `data-rtx-effect`／`data-rtx-rev` 標記，`loadViewerPlugins` 注入前以 `pruneEffectScripts()` 移除已完成舊節點（保留 in-flight 防競態），使 `document.head` 插件節點數 ≈ 啟用特效數、不隨 manifest 重載次數累積；`tests/e2e/reload-manifest.spec.js` 連續兩次改 manifest 驗證節點數 4→3→2（2026-09-29）
+- [ ] 前端記憶體治理後續（依 `docs/temp/frontend-memory/FRONTEND_MEMORY_PLAN.md`）：Phase 1 剩餘 console／editor 插件 script 去重回收（S1）、Phase 2 editor 預覽 fetch 文字＋`new Function` 與 `Effects.registry` 收斂（S2＋S3）、Phase 3 ETag 條件請求＋可觀測性（S4＋S5）（2026-09-29）

@@ -5,7 +5,7 @@ import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import { ensurePanelOpen, TEST_EFFECTS } from "./helpers.js";
+import { ensurePanelOpen, TEST_EFFECTS, waitRateLimit } from "./helpers.js";
 
 const ROOT = process.cwd();
 const KEY = "reload-e2e-key";
@@ -133,6 +133,9 @@ test("viewer auto-updates manifest; consoles require manual reload or refresh", 
       { timeout: 10000 }
     );
     expect(await viewer.evaluate(() => "firework" in window.Effects.registry)).toBe(true);
+    expect(
+      await viewer.evaluate(() => document.head.querySelectorAll("script[data-rtx-effect]").length)
+    ).toBe(TEST_EFFECTS.length);
 
     const aEffects = consoleA.waitForResponse((resp) => resp.url().endsWith("/api/effects") && resp.ok());
     await consoleA.goto(base + "/examples/embed-console.html", { waitUntil: "domcontentloaded" });
@@ -166,6 +169,30 @@ test("viewer auto-updates manifest; consoles require manual reload or refresh", 
       undefined,
       { timeout: 10000 }
     );
+    expect(
+      await viewer.evaluate(() => document.head.querySelectorAll("script[data-rtx-effect]").length)
+    ).toBe(TEST_EFFECTS.length - 1);
+
+    const secondManifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    delete secondManifest.effects.ripple;
+    fs.writeFileSync(manifestPath, JSON.stringify(secondManifest, null, 2) + "\n");
+
+    await waitRateLimit();
+    const secondReloadRes = await fetch(base + "/api/effects/reload", {
+      method: "POST",
+      headers: { "X-Access-Key": KEY },
+    });
+    expect(secondReloadRes.ok).toBe(true);
+    expect((await secondReloadRes.json()).changed).toBe(true);
+
+    await viewer.waitForFunction(
+      () => window.Effects && !("ripple" in window.Effects.registry) && "particle" in window.Effects.registry,
+      undefined,
+      { timeout: 10000 }
+    );
+    expect(
+      await viewer.evaluate(() => document.head.querySelectorAll("script[data-rtx-effect]").length)
+    ).toBe(TEST_EFFECTS.length - 2);
 
     await new Promise((resolve) => setTimeout(resolve, 500));
     await expect(consoleA.locator("#rtx-fx-firework")).toHaveCount(1);

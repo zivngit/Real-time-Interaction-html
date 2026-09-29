@@ -14,14 +14,31 @@
   var key = cfg.key || (script ? script.getAttribute("data-key") : "") || "";
   var currentRev = "";
 
-  function loadScript(src) {
+  var inflightEffectScripts = {};
+
+  function pruneEffectScripts() {
+    var nodes = document.head.querySelectorAll("script[data-rtx-effect]");
+    for (var i = 0; i < nodes.length; i++) {
+      var id = nodes[i].getAttribute("data-rtx-effect");
+      if (nodes[i] !== inflightEffectScripts[id]) nodes[i].remove();
+    }
+  }
+
+  function loadScript(src, effectId, rev) {
     return new Promise(function (resolve) {
       var s = document.createElement("script");
       s.src = src;
+      if (effectId) {
+        s.setAttribute("data-rtx-effect", effectId);
+        s.setAttribute("data-rtx-rev", rev || "");
+        inflightEffectScripts[effectId] = s;
+      }
       s.onload = function () {
+        if (effectId && inflightEffectScripts[effectId] === s) delete inflightEffectScripts[effectId];
         resolve(true);
       };
       s.onerror = function () {
+        if (effectId && inflightEffectScripts[effectId] === s) delete inflightEffectScripts[effectId];
         resolve(false);
       };
       document.head.appendChild(s);
@@ -32,20 +49,19 @@
     if (typeof Effects !== "undefined" && typeof Effects.reset === "function") {
       Effects.reset();
     }
-    var urls = Object.keys(effects)
-      .map(function (id) {
-        return effects[id] && effects[id].viewerUrl;
-      })
-      .filter(Boolean);
-    if (urls.length) {
+    var ids = Object.keys(effects).filter(function (id) {
+      return effects[id] && effects[id].viewerUrl;
+    });
+    pruneEffectScripts();
+    if (ids.length) {
       var suffix = rev ? "?v=" + encodeURIComponent(rev) : "";
       var results = await Promise.all(
-        urls.map(function (u) {
-          return loadScript(base + u + suffix);
+        ids.map(function (id) {
+          return loadScript(base + effects[id].viewerUrl + suffix, id, rev);
         })
       );
-      urls.forEach(function (u, i) {
-        if (!results[i]) console.warn("[effects] 特效插件載入失敗，略過", u);
+      ids.forEach(function (id, i) {
+        if (!results[i]) console.warn("[effects] 特效插件載入失敗，略過", effects[id].viewerUrl);
       });
     }
     if (rev) {
