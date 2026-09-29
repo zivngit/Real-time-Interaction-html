@@ -770,6 +770,7 @@
         icon: e.icon,
         viewerUrl: e.viewerUrl,
         consoleUrl: e.consoleUrl || null,
+        consoleRev: e.consoleRev || null,
         params: e.params && typeof e.params === "object" && !Array.isArray(e.params) ? e.params : {},
       };
     });
@@ -811,11 +812,13 @@
     pruneConsolePlugins();
     var jobs = [];
     Object.keys(meta).forEach(function (type) {
-      var url = meta[type] && meta[type].consoleUrl;
+      var spec = meta[type];
+      var url = spec && spec.consoleUrl;
       if (!url) return;
-      var suffix = rev ? "?v=" + encodeURIComponent(rev) : "";
+      var effRev = spec.consoleRev || rev;
+      var suffix = effRev ? "?v=" + encodeURIComponent(effRev) : "";
       jobs.push(
-        loadScriptTag(srvUrl + url + suffix, type, rev).then(function (ok) {
+        loadScriptTag(srvUrl + url + suffix, type, effRev).then(function (ok) {
           if (!ok) console.warn("[control] console 插件載入失敗，使用 schema 渲染", srvUrl + url + suffix);
         })
       );

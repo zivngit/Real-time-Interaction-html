@@ -330,7 +330,7 @@ npx playwright test
 npm run test
 ```
 
-目前測試數量：pytest 159 項（`test_api` 61、`test_server_logging` 13、`test_editor_api` 85）、node 237 項（`test_console` 72、`test_effect_examples` 16、`test_effects` 19、`test_effect_catalog` 2、`test_editor` 128）、Playwright E2E 87 項（`tests/e2e/editor.spec.js` 59 項）。
+目前測試數量：pytest 161 項（`test_api` 63、`test_server_logging` 13、`test_editor_api` 85）、node 239 項（`test_console` 74、`test_effect_examples` 16、`test_effects` 19、`test_effect_catalog` 2、`test_editor` 128）、Playwright E2E 87 項（`tests/e2e/editor.spec.js` 59 項）。
 
 Playwright E2E 會自動啟動 server（port `8123`）；webServer 先經 `tests/e2e/pre-server-copy.mjs` 把 `tests/fixtures/` 的 4 特效複製到隔離的 `tmp/e2e-effects/`，並以 `RTX_EFFECTS_DIR` 指向該目錄（`tests/e2e/global-teardown.js` 測試後清理，E2E 全程不碰正式 `effects/`）；uvicorn stdout/stderr 重定向至 gitignored `e2e-server.log`。`tests/e2e/editor.spec.js`（59 項）驗證 `/editor` 全功能：manifest 載入／重載／SSE、meta/params 編輯保存與 409、批次操作、新增特效（effect_id 欄位）、zip 匯入匯出、代碼編輯、即時預覽與 timeline、[測試特效]、簡化 console 面板、格式檢查與狀態指標。其餘 spec 各管一題：`fx-layout`（console 雙區拖曳／FLIP 動畫／localStorage）、`fx-drag-trigger-distance`（8 方向拖曳觸發距離）、`fx-button-counts`（console 按鈕數）、`reload-manifest`（viewer 自動更新／console 手動重載）、`multi-console-reload`（多 console 獨立重載）、`effect-params`（參數輸入送 POST body）、`console-viewer-flow`（console→viewer 流程）、`examples-smoke`／`examples-theme-toggle`（examples 頁 smoke 與主題切換）。
 

@@ -1297,6 +1297,26 @@ test("manual reload prunes stale console plugin script nodes", async () => {
   });
 });
 
+test("console plugins use per-effect consoleRev for cache-busting and fall back to global rev", async () => {
+  const perEffectRev = "c" + "a".repeat(31);
+  const env = await makeEnv({
+    effectsJson: {
+      rev: "rev-1",
+      effects: {
+        particle: { ...DEFAULT_EFFECTS.particle, consoleRev: perEffectRev },
+        ripple: DEFAULT_EFFECTS.ripple,
+      },
+    },
+  });
+  assert.ok(env.scriptLoads.includes("http://localhost:8000/effects/particle/console.js?v=" + perEffectRev));
+  assert.ok(env.scriptLoads.includes("http://localhost:8000/effects/ripple/console.js?v=rev-1"));
+  const scripts = env.head.querySelectorAll("script[data-rtx-effect]");
+  const particle = scripts.find((s) => s.getAttribute("data-rtx-effect") === "particle");
+  const ripple = scripts.find((s) => s.getAttribute("data-rtx-effect") === "ripple");
+  assert.equal(particle.getAttribute("data-rtx-rev"), perEffectRev);
+  assert.equal(ripple.getAttribute("data-rtx-rev"), "rev-1");
+});
+
 test("console plugin load failure keeps schema rendering", async () => {
   const env = await makeEnv({
     scriptFailPatterns: [/effects\/particle\/console\.js/],

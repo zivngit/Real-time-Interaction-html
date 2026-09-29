@@ -12,7 +12,7 @@
 
 - SSE 斷線期間特效遺失（規格：不重播）
 - 限頻為全域滑動視窗（未區分客戶端）
-- 前端（console/viewer/editor）已有 Playwright 瀏覽器 E2E（`tests/e2e/`，87 項，含 `editor.spec.js` 59 項；webServer stdout/stderr 重定向 gitignored `e2e-server.log`、測試輸出不混 server log；webServer 以 `RTX_EFFECTS_DIR` 指向 `pre-server-copy.mjs` 複製的隔離 `tmp/e2e-effects/`（僅 fixture 4 特效）、`globalTeardown` 清理，E2E 不碰正式 `effects/`）；console 另有 node vm 冒煙測試（`tests/test_console.mjs`，72 項），viewer 另有 node vm 冒煙測試（`tests/test_effects.mjs`，19 項），特效編輯器另有 node vm 測試（`tests/test_editor.mjs`，128 項）與 pytest API 測試（`tests/test_editor_api.py`，85 項），特效範例另有 node vm 冒煙測試（`tests/test_effect_examples.mjs`，16 項），正式 catalog 另有 node vm 驗證測試（`tests/test_effect_catalog.mjs`，2 項）
+- 前端（console/viewer/editor）已有 Playwright 瀏覽器 E2E（`tests/e2e/`，87 項，含 `editor.spec.js` 59 項；webServer stdout/stderr 重定向 gitignored `e2e-server.log`、測試輸出不混 server log；webServer 以 `RTX_EFFECTS_DIR` 指向 `pre-server-copy.mjs` 複製的隔離 `tmp/e2e-effects/`（僅 fixture 4 特效）、`globalTeardown` 清理，E2E 不碰正式 `effects/`）；console 另有 node vm 冒煙測試（`tests/test_console.mjs`，74 項），viewer 另有 node vm 冒煙測試（`tests/test_effects.mjs`，19 項），特效編輯器另有 node vm 測試（`tests/test_editor.mjs`，128 項）與 pytest API 測試（`tests/test_editor_api.py`，85 項），特效範例另有 node vm 冒煙測試（`tests/test_effect_examples.mjs`，16 項），正式 catalog 另有 node vm 驗證測試（`tests/test_effect_catalog.mjs`，2 項）
 
 ## 第一階段：建立可維護的執行基礎
 
@@ -88,7 +88,7 @@
 - [ ] 處理 pytest 的 2 個第三方 deprecation warnings：評估加入 `httpx2` 並限制 `anyio>=4.10,<4.15`（已用 temp dependencies 驗證可消除 warnings；2026-09-11 暫不處理）
 - [ ] server 斷線重播暫存（最近 N 則）
 - [ ] viewer 狀態回報（POST /api/status）
-- [ ] 多 viewer 負載／效能測試
+- [ ] 多 viewer 負載／效能測試（含 server SSE 背壓：訂閱者無界 `asyncio.Queue` 改有界＋drop-oldest 或超額斷線——`server/main.py:155`、`server/relay.py:30`；慢/卡住客戶端之 queue 現會無限累積 broadcast 訊息）
 - [x] 實作 effects 編輯器（依 PLAN_EFFECTS_EDITOR.md：`server/editor.py` API、`editor/` 三欄 UI、即時預覽、批次操作、自動測試）（2026-09-20）
   - [x] 子任務 5a–6o（2026-09-20~23，39 項）：編輯器 UI 與功能改進／修正（effects.json 單項檢視、匯入匯出、staged、備份、格式檢查、即時預覽、新增特效 re-key、原子保存、列表就地更新、待刪除區、effect_id 欄位、dirty 指標、E2E 隔離、測試源改 fixtures 等）；逐項見 git 歷史
   - 各 Phase／子任務的逐項實作、測試與文件異動，詳見 git 歷史。
@@ -125,4 +125,5 @@
 - [x] 前端記憶體治理 Phase 1（viewer，S1）：插件 script 節點以 `data-rtx-effect` 標記、重載前移除舊節點，防 `document.head` 累積（2026-09-29）
 - [x] 前端記憶體治理 Phase 1（console，S1）：插件 script 節點以 `data-rtx-effect` 標記、手動重載前移除舊節點，防 `document.head` 累積（2026-09-29）
 - [x] 前端記憶體治理 Phase 3（viewer＋server，S4）：manifest 每個特效加 `viewerRev`／`consoleRev`（插件檔 SHA-256）、主體與插件靜態資產 `no-store`→`no-cache`＋`ETag`、`If-None-Match` 未變回 304、viewer 以 `?v=viewerRev` per-effect cache-busting（2026-09-29）
-- [ ] 前端記憶體治理後續（依 `docs/temp/frontend-memory/FRONTEND_MEMORY_PLAN.md`）：Phase 1 剩餘 editor、Phase 2（S2＋S3）、Phase 3（S4 剩餘 console per-effect rev、S5 可觀測性）（2026-09-29）
+- [x] 前端記憶體治理 Phase 3（console，S4 剩餘）：console 插件改以 per-effect `consoleRev` 做 cache-busting（`?v=consoleRev`、缺時 fallback manifest rev），未變插件 ETag 304 重驗證（2026-09-29）
+- [ ] 前端記憶體治理後續（依 `docs/temp/frontend-memory/FRONTEND_MEMORY_PLAN.md`）：Phase 1 剩餘 editor、Phase 2（S2＋S3）、Phase 3（S5 可觀測性）（2026-09-29）

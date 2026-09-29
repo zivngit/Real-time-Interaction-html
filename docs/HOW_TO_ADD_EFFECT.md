@@ -117,7 +117,7 @@ server 啟動時驗證 manifest（`version`、effect ID、`enabled` 型別、ena
 | `select` | 不在 `options.value` 用 `default` |
 | `array` | 非 array 用 `default`；短於 `minItems` 用 `default`；超過 `maxItems` 截斷；元素值依 `items` 型別驗證 |
 
-server 靜態路由 `GET /effects/{effect_id}/viewer.js` 與 `GET /effects/{effect_id}/console.js` 會服務插件檔（`Cache-Control: no-cache`＋`ETag`；客戶端以 `If-None-Match` 重驗證時內容未變回 `304`，禁止 path traversal）。`GET /api/effects` 與 SSE `manifest` 事件的每個特效另含 `viewerRev`／`consoleRev`（該特效插件檔內容的 SHA-256），viewer 以此做 per-effect cache-busting（`?v=`），僅變更的插件才會實際重新下載與執行。
+server 靜態路由 `GET /effects/{effect_id}/viewer.js` 與 `GET /effects/{effect_id}/console.js` 會服務插件檔（`Cache-Control: no-cache`＋`ETag`；客戶端以 `If-None-Match` 重驗證時內容未變回 `304`，禁止 path traversal）。`GET /api/effects` 與 SSE `manifest` 事件的每個特效另含 `viewerRev`／`consoleRev`（該特效插件檔內容的 SHA-256），viewer／console 以此做 per-effect cache-busting（`?v=viewerRev`／`?v=consoleRev`），僅變更的插件才會實際重新下載與執行。
 
 修改 manifest 或特效插件後，可呼叫 `POST /api/effects/reload` 手動重載（POST 端僅可透過 `X-Access-Key` header 提供金鑰；不接受 `?key=` query 或 POST body 金鑰）。server 會重新讀取 manifest、驗證 schema、計算包含 manifest 與 `viewer.js`／`console.js` 內容的 fingerprint `rev`；fingerprint 未變時回傳 `changed: false`，驗證失敗時保留舊 catalog 並回傳 `400`。viewer 會依 SSE `manifest` 自動更新插件；console 需展開［連線設定］後點［重載］，或重新整理頁面。
 

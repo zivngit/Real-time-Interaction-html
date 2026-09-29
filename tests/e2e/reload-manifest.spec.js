@@ -240,6 +240,18 @@ test("viewer auto-updates manifest; consoles require manual reload or refresh", 
     await consoleA.locator("#rtx-fx-firework").waitFor({ state: "detached", timeout: 10000 });
     await expect(consoleA.locator("#rtx-fx-particle")).toHaveCount(1);
 
+    const consolePluginRevs = await consoleA.evaluate(() =>
+      [...document.head.querySelectorAll("script[data-rtx-effect]")].map((node) => ({
+        id: node.getAttribute("data-rtx-effect"),
+        rev: node.getAttribute("data-rtx-rev"),
+      }))
+    );
+    expect(consolePluginRevs.map((item) => item.id).sort()).toEqual(["particle", "text"]);
+    for (const { id, rev } of consolePluginRevs) {
+      const content = fs.readFileSync(path.join(effectsDir, id, "console.js"));
+      expect(rev).toBe(createHash("sha256").update(content).digest("hex"));
+    }
+
     await consoleB.reload({ waitUntil: "domcontentloaded" });
     await consoleB.evaluate(() => window.__rtxConsoleReady.then(() => true));
     await consoleB.locator("#rtx-fx-firework").waitFor({ state: "detached", timeout: 10000 });
