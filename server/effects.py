@@ -135,9 +135,11 @@ def _sanitize_effect(effect_id: str, spec: dict) -> dict:
     if "icon" in spec:
         entry["icon"] = spec["icon"]
     entry["viewerUrl"] = f"/effects/{effect_id}/{viewer}"
+    entry["viewerRev"] = _file_hash(EFFECTS_DIR / effect_id / viewer)
     console = spec.get("console", "console.js")
     console_path = EFFECTS_DIR / effect_id / console
     entry["consoleUrl"] = f"/effects/{effect_id}/{console}" if console_path.is_file() else None
+    entry["consoleRev"] = _file_hash(console_path) if console_path.is_file() else None
     entry["params"] = spec.get("params") or {}
     return entry
 

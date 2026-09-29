@@ -124,4 +124,5 @@
 - [ ] effects 編輯器後續小項：`POST /api/editor/import` 缺 `file` 欄位回 422 先於 401（FastAPI body 驗證先於 auth）；「zip 清目錄後匯入回補」情境建議人工瀏覽器確認（2026-09-20 Phase 4 核對提出；原「发送到 viewer 後 viewer 渲染」情境隨 [发送到 viewer] 按鈕移除而作廢）
 - [x] 前端記憶體治理 Phase 1（viewer，S1）：插件 script 節點以 `data-rtx-effect` 標記、重載前移除舊節點，防 `document.head` 累積（2026-09-29）
 - [x] 前端記憶體治理 Phase 1（console，S1）：插件 script 節點以 `data-rtx-effect` 標記、手動重載前移除舊節點，防 `document.head` 累積（2026-09-29）
-- [ ] 前端記憶體治理後續（依 `docs/temp/frontend-memory/FRONTEND_MEMORY_PLAN.md`）：Phase 1 剩餘 editor、Phase 2（S2＋S3）、Phase 3（S4＋S5）（2026-09-29）
+- [x] 前端記憶體治理 Phase 3（viewer＋server，S4）：manifest 每個特效加 `viewerRev`／`consoleRev`（插件檔 SHA-256）、主體與插件靜態資產 `no-store`→`no-cache`＋`ETag`、`If-None-Match` 未變回 304、viewer 以 `?v=viewerRev` per-effect cache-busting（2026-09-29）
+- [ ] 前端記憶體治理後續（依 `docs/temp/frontend-memory/FRONTEND_MEMORY_PLAN.md`）：Phase 1 剩餘 editor、Phase 2（S2＋S3）、Phase 3（S4 剩餘 console per-effect rev、S5 可觀測性）（2026-09-29）

@@ -1,5 +1,6 @@
 import asyncio
 import copy
+import hashlib
 import json
 import logging
 import os
@@ -310,7 +311,7 @@ def test_serves_effects_manifest_json(client):
     r = client.get("/effects/effects.json")
     assert r.status_code == 200
     assert "json" in r.headers["content-type"]
-    assert r.headers["cache-control"] == "no-store"
+    assert r.headers["cache-control"] == "no-cache"
     body = r.json()
     assert body["version"] == 1
     assert set(body["effects"].keys()) == {"particle", "ripple", "firework", "text"}
@@ -321,7 +322,7 @@ def test_serves_effect_viewer_js(client):
         r = client.get(f"/effects/{effect_id}/viewer.js")
         assert r.status_code == 200
         assert "javascript" in r.headers["content-type"]
-        assert r.headers["cache-control"] == "no-store"
+        assert r.headers["cache-control"] == "no-cache"
         assert "register" in r.text
 
 
@@ -330,8 +331,31 @@ def test_serves_effect_console_js_when_present(client):
         r = client.get(f"/effects/{effect_id}/console.js")
         assert r.status_code == 200
         assert "javascript" in r.headers["content-type"]
-        assert r.headers["cache-control"] == "no-store"
+        assert r.headers["cache-control"] == "no-cache"
         assert "RTX_EFFECT_CONSOLE" in r.text
+
+
+def test_effects_list_includes_per_effect_rev(client):
+    fixture_dir = Path(__file__).resolve().parent / "fixtures"
+    r = client.get("/api/effects")
+    assert r.status_code == 200
+    for effect_id, entry in r.json()["effects"].items():
+        viewer_bytes = (fixture_dir / effect_id / "viewer.js").read_bytes()
+        assert entry["viewerRev"] == hashlib.sha256(viewer_bytes).hexdigest()
+        if entry["consoleUrl"] is None:
+            assert entry["consoleRev"] is None
+        else:
+            console_bytes = (fixture_dir / effect_id / "console.js").read_bytes()
+            assert entry["consoleRev"] == hashlib.sha256(console_bytes).hexdigest()
+
+
+def test_static_assets_support_conditional_requests(client):
+    for route in ("/effects/particle/viewer.js", "/viewer/app.js", "/console/app.js"):
+        r = client.get(route)
+        assert r.status_code == 200
+        etag = r.headers["etag"]
+        assert etag
+        assert client.get(route, headers={"If-None-Match": etag}).status_code == 304
 
 
 def test_missing_effect_console_js_is_404(client):
@@ -501,7 +525,7 @@ def test_serves_viewer_app_js(client):
     r = client.get("/viewer/app.js")
     assert r.status_code == 200
     assert "javascript" in r.headers["content-type"]
-    assert r.headers["cache-control"] == "no-store"
+    assert r.headers["cache-control"] == "no-cache"
     assert "EventSource" in r.text
 
 
@@ -509,7 +533,7 @@ def test_serves_viewer_effects_js(client):
     r = client.get("/viewer/effects.js")
     assert r.status_code == 200
     assert "javascript" in r.headers["content-type"]
-    assert r.headers["cache-control"] == "no-store"
+    assert r.headers["cache-control"] == "no-cache"
     assert "createEffect" in r.text
 
 
@@ -517,7 +541,7 @@ def test_serves_console_app_js(client):
     r = client.get("/console/app.js")
     assert r.status_code == 200
     assert "javascript" in r.headers["content-type"]
-    assert r.headers["cache-control"] == "no-store"
+    assert r.headers["cache-control"] == "no-cache"
     assert "rtx-console" in r.text
 
 
@@ -525,7 +549,7 @@ def test_serves_console_style_css(client):
     r = client.get("/console/style.css")
     assert r.status_code == 200
     assert "css" in r.headers["content-type"]
-    assert r.headers["cache-control"] == "no-store"
+    assert r.headers["cache-control"] == "no-cache"
     assert "#rtx-fab" in r.text
 
 
@@ -533,7 +557,7 @@ def test_serves_console_icons_js(client):
     r = client.get("/console/icons.js")
     assert r.status_code == 200
     assert "javascript" in r.headers["content-type"]
-    assert r.headers["cache-control"] == "no-store"
+    assert r.headers["cache-control"] == "no-cache"
     assert "RTX_EFFECT_ICONS" in r.text
     assert "RTX_UI_ICONS" in r.text
 

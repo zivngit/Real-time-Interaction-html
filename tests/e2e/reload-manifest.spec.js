@@ -1,6 +1,7 @@
 // @ts-check
 import { test, expect } from "@playwright/test";
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
@@ -14,6 +15,7 @@ const RELOADED_EFFECTS = TEST_EFFECTS.filter((effect) => effect !== "firework");
 let child = null;
 let tempDir = null;
 let manifestPath = "";
+let effectsDir = "";
 let base = "";
 let serverLog = "";
 
@@ -61,6 +63,8 @@ test.beforeAll(async () => {
   tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "rtx-reload-"));
   manifestPath = path.join(tempDir, "effects.json");
   fs.copyFileSync(path.join(ROOT, "tests", "fixtures", "effects.json"), manifestPath);
+  effectsDir = path.join(tempDir, "effects");
+  fs.cpSync(path.join(ROOT, "tests", "fixtures"), effectsDir, { recursive: true });
 
   const venvPython = path.join(
     ROOT,
@@ -77,7 +81,7 @@ test.beforeAll(async () => {
         ...process.env,
         ACCESS_KEY: KEY,
         RTX_EFFECTS_MANIFEST: manifestPath,
-        RTX_EFFECTS_DIR: path.join(ROOT, "tests", "fixtures"),
+        RTX_EFFECTS_DIR: effectsDir,
         SERVE_EXAMPLES: "1",
       },
       stdio: ["ignore", "pipe", "pipe"],
@@ -107,6 +111,13 @@ test("viewer auto-updates manifest; consoles require manual reload or refresh", 
     window.EFFECT_DISPLAY = { url, key };
   }, { url: base, key: KEY });
   const viewer = await viewerCtx.newPage();
+  const pluginResponses = [];
+  viewer.on("response", (resp) => {
+    const url = resp.url();
+    if (url.startsWith(base + "/effects/") && url.includes("/viewer.js?")) {
+      pluginResponses.push({ url, status: resp.status() });
+    }
+  });
 
   const consoleACtx = await browser.newContext();
   await consoleACtx.addInitScript(({ url, key }) => {
@@ -136,6 +147,19 @@ test("viewer auto-updates manifest; consoles require manual reload or refresh", 
     expect(
       await viewer.evaluate(() => document.head.querySelectorAll("script[data-rtx-effect]").length)
     ).toBe(TEST_EFFECTS.length);
+    expect(pluginResponses.length).toBeGreaterThanOrEqual(TEST_EFFECTS.length);
+    for (const hit of pluginResponses) expect(hit.status).toBe(200);
+    const initialRevs = await viewer.evaluate(() =>
+      [...document.head.querySelectorAll("script[data-rtx-effect]")].map((node) => ({
+        id: node.getAttribute("data-rtx-effect"),
+        rev: node.getAttribute("data-rtx-rev"),
+      }))
+    );
+    for (const { id, rev } of initialRevs) {
+      const content = fs.readFileSync(path.join(effectsDir, id, "viewer.js"));
+      expect(rev).toBe(createHash("sha256").update(content).digest("hex"));
+    }
+    let since = pluginResponses.length;
 
     const aEffects = consoleA.waitForResponse((resp) => resp.url().endsWith("/api/effects") && resp.ok());
     await consoleA.goto(base + "/examples/embed-console.html", { waitUntil: "domcontentloaded" });
@@ -172,6 +196,12 @@ test("viewer auto-updates manifest; consoles require manual reload or refresh", 
     expect(
       await viewer.evaluate(() => document.head.querySelectorAll("script[data-rtx-effect]").length)
     ).toBe(TEST_EFFECTS.length - 1);
+    expect(pluginResponses.slice(since).length).toBe(RELOADED_EFFECTS.length);
+    for (const hit of pluginResponses.slice(since)) {
+      expect(hit.status).toBe(304);
+      expect(hit.url).toContain("?v=");
+    }
+    since = pluginResponses.length;
 
     const secondManifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
     delete secondManifest.effects.ripple;
@@ -193,6 +223,11 @@ test("viewer auto-updates manifest; consoles require manual reload or refresh", 
     expect(
       await viewer.evaluate(() => document.head.querySelectorAll("script[data-rtx-effect]").length)
     ).toBe(TEST_EFFECTS.length - 2);
+    expect(pluginResponses.slice(since).length).toBe(TEST_EFFECTS.length - 2);
+    for (const hit of pluginResponses.slice(since)) {
+      expect(hit.status).toBe(304);
+    }
+    since = pluginResponses.length;
 
     await new Promise((resolve) => setTimeout(resolve, 500));
     await expect(consoleA.locator("#rtx-fx-firework")).toHaveCount(1);
@@ -209,6 +244,37 @@ test("viewer auto-updates manifest; consoles require manual reload or refresh", 
     await consoleB.evaluate(() => window.__rtxConsoleReady.then(() => true));
     await consoleB.locator("#rtx-fx-firework").waitFor({ state: "detached", timeout: 10000 });
     await expect(consoleB.locator("#rtx-fx-particle")).toHaveCount(1);
+
+    const textRevBefore = initialRevs.find((item) => item.id === "text").rev;
+    fs.appendFileSync(path.join(effectsDir, "text", "viewer.js"), "\n// e2e: content change\n");
+
+    await waitRateLimit();
+    const thirdReloadRes = await fetch(base + "/api/effects/reload", {
+      method: "POST",
+      headers: { "X-Access-Key": KEY },
+    });
+    expect(thirdReloadRes.ok).toBe(true);
+    expect((await thirdReloadRes.json()).changed).toBe(true);
+
+    await viewer.waitForFunction(
+      () => window.Effects && "text" in window.Effects.registry && "particle" in window.Effects.registry,
+      undefined,
+      { timeout: 10000 }
+    );
+    const thirdHits = pluginResponses.slice(since);
+    expect(thirdHits.length).toBe(TEST_EFFECTS.length - 2);
+    const particleHit = thirdHits.find((hit) => hit.url.includes("/effects/particle/viewer.js"));
+    const textHit = thirdHits.find((hit) => hit.url.includes("/effects/text/viewer.js"));
+    expect(particleHit.status).toBe(304);
+    expect(textHit.status).toBe(200);
+    const textRevAfter = await viewer.evaluate(() =>
+      document.head.querySelector('script[data-rtx-effect="text"]').getAttribute("data-rtx-rev")
+    );
+    expect(textRevAfter).not.toBe(textRevBefore);
+    expect(textHit.url).toBe(`${base}/effects/text/viewer.js?v=${textRevAfter}`);
+    expect(
+      await viewer.evaluate(() => document.head.querySelectorAll("script[data-rtx-effect]").length)
+    ).toBe(TEST_EFFECTS.length - 2);
   } finally {
     await viewerCtx.close();
     await consoleACtx.close();

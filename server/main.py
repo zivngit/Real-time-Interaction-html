@@ -165,43 +165,43 @@ async def stream(
 
 
 @app.get("/viewer/app.js")
-async def viewer_app_js():
-    return file_response(VIEWER_APP_JS, "application/javascript", "viewer/app.js not found")
+async def viewer_app_js(request: Request):
+    return file_response(VIEWER_APP_JS, "application/javascript", "viewer/app.js not found", request)
 
 
 @app.get("/viewer/effects.js")
-async def viewer_effects_js():
-    return file_response(VIEWER_EFFECTS_JS, "application/javascript", "viewer/effects.js not found")
+async def viewer_effects_js(request: Request):
+    return file_response(VIEWER_EFFECTS_JS, "application/javascript", "viewer/effects.js not found", request)
 
 
 @app.get("/console/app.js")
-async def console_app_js():
-    return file_response(CONSOLE_APP_JS, "application/javascript", "console/app.js not found")
+async def console_app_js(request: Request):
+    return file_response(CONSOLE_APP_JS, "application/javascript", "console/app.js not found", request)
 
 
 @app.get("/console/icons.js")
-async def console_icons_js():
-    return file_response(CONSOLE_ICONS_JS, "application/javascript", "console/icons.js not found")
+async def console_icons_js(request: Request):
+    return file_response(CONSOLE_ICONS_JS, "application/javascript", "console/icons.js not found", request)
 
 
 @app.get("/console/style.css")
-async def console_style_css():
-    return file_response(CONSOLE_CSS, "text/css", "console/style.css not found")
+async def console_style_css(request: Request):
+    return file_response(CONSOLE_CSS, "text/css", "console/style.css not found", request)
 
 
 @app.get("/effects/effects.json")
-async def effects_manifest():
-    return file_response(effects.MANIFEST_PATH, "application/json", "effects/effects.json not found")
+async def effects_manifest(request: Request):
+    return file_response(effects.MANIFEST_PATH, "application/json", "effects/effects.json not found", request)
 
 
 @app.get("/effects/{effect_id}/viewer.js")
 async def effect_viewer_js(effect_id: str, request: Request):
-    return effect_asset(effect_id, "viewer.js", client=client_host(request))
+    return effect_asset(effect_id, "viewer.js", client=client_host(request), request=request)
 
 
 @app.get("/effects/{effect_id}/console.js")
 async def effect_console_js(effect_id: str, request: Request):
-    return effect_asset(effect_id, "console.js", client=client_host(request))
+    return effect_asset(effect_id, "console.js", client=client_host(request), request=request)
 
 
 @app.get("/examples")

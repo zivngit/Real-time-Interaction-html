@@ -54,10 +54,12 @@
     });
     pruneEffectScripts();
     if (ids.length) {
-      var suffix = rev ? "?v=" + encodeURIComponent(rev) : "";
       var results = await Promise.all(
         ids.map(function (id) {
-          return loadScript(base + effects[id].viewerUrl + suffix, id, rev);
+          var spec = effects[id];
+          var effRev = spec.viewerRev || rev;
+          var suffix = effRev ? "?v=" + encodeURIComponent(effRev) : "";
+          return loadScript(base + spec.viewerUrl + suffix, id, effRev);
         })
       );
       ids.forEach(function (id, i) {

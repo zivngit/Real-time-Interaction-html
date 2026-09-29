@@ -1,6 +1,6 @@
 # Real-time Interaction html 函式呼叫關係圖
 
-> 最後更新：2026-09-28
+> 最後更新：2026-09-29
 
 ## 1. 整體架構
 
@@ -16,11 +16,11 @@ flowchart LR
     ET[("localStorage<br/>examples-theme")]
     C -->|"POST /api/effect、POST /api/clear、POST /api/effects/reload"| S
     C -->|"GET /api/effects"| S
-    C -->|"GET /console/style.css、/console/icons.js、/console/app.js (no-store)"| S
-    C -->|"GET /effects/{id}/console.js (no-store，選用)"| S
+    C -->|"GET /console/style.css、/console/icons.js、/console/app.js (no-cache＋ETag)"| S
+    C -->|"GET /effects/{id}/console.js (no-cache＋ETag，選用)"| S
     S -->|"GET /api/stream<br/>(SSE: effect / clear / ping / manifest)"| V
-    V -->|"GET /viewer/app.js、/viewer/effects.js (no-store)"| S
-    V -->|"GET /api/effects、/effects/{id}/viewer.js (no-store)"| S
+    V -->|"GET /viewer/app.js、/viewer/effects.js (no-cache＋ETag)"| S
+    V -->|"GET /api/effects、/effects/{id}/viewer.js (no-cache＋ETag、?v=viewerRev)"| S
     S -->|"GET /examples/*（no-store，opt-in）"| E
     E -->|"連結 embed-*.html"| C
     E -->|"連結 embed-*.html"| V
@@ -29,8 +29,8 @@ flowchart LR
     ET -.-> V
     ET -.-> E
     EDP -->|"GET /editor / /editor/ / /editor/app.js / /editor/style.css (no-store)"| S
-    EDP -->|"GET /console/icons.js (no-store)"| S
-    EDP -->|"GET /effects/{id}/console.js (no-store、?v=rev、簡化 console 按需載入 icon＋參數 render)"| S
+    EDP -->|"GET /console/icons.js (no-cache＋ETag)"| S
+    EDP -->|"GET /effects/{id}/console.js (no-cache＋ETag、?v=rev、簡化 console 按需載入 icon＋參數 render)"| S
     EDP -->|"GET /api/editor/manifest · PUT /api/editor/manifest · GET/PUT /api/editor/effect/{id}/viewer.js|console.js · DELETE /api/editor/effect/{id} · DELETE /api/editor/effect/{id}/console.js · POST /api/editor/export · POST /api/editor/import · POST /api/effects/reload（X-Access-Key）"| S
     S -->|"GET /api/stream（SSE：manifest 事件；?key=）"| EDP
     ELS -.-> EDP
@@ -92,7 +92,7 @@ flowchart TD
         OK["200 {ok, ts}"]
         LOK["200 {rev, version, effects, currentEffects, alternateEffects}"]
         RLOK["200 {ok, changed, rev, effects}"]
-        FR["FileResponse（server/static_files.py；no-store）"]
+        FR["FileResponse（server/static_files.py；no-cache＋ETag；If-None-Match 命中→304）"]
         ELOK["200 {ok, changed, rev, created, effects}（editor 寫入）"]
         EZ["effects.zip（application/zip、attachment、no-store；ids 非空時 effects.json 只含所匯出 effects）"]
     end
@@ -158,8 +158,8 @@ sequenceDiagram
     Note over C: 手動重載：展開 #rtx-conn-panel → 點擊 SVG #rtx-reload-btn → POST /api/effects/reload → GET /api/effects → applyManifest(rev, resetRegistry=true)
     C->>S: POST /api/effects/reload
     S->>S: check_key → reload_limiter.check(1) → reload_effects（fingerprint 未變則 changed=false；驗證失敗回 400 並保留舊 catalog；v2 layout 中 disabled ID 正規化時過濾並記 warning，不視為驗證錯誤）
-    S-->>V: SSE event: manifest（changed=true 時，含 rev/effects）
-    V->>V: loadViewerPlugins：Effects.reset → pruneEffectScripts 移除已完成插件 script 節點（保留 in-flight）→ 依 rev cache-busting 注入帶 data-rtx-effect／data-rtx-rev 標記的 viewer.js；不清除 active effects
+    S-->>V: SSE event: manifest（changed=true 時，含 rev/effects（per-effect viewerRev／consoleRev））
+    V->>V: loadViewerPlugins：Effects.reset → pruneEffectScripts 移除已完成插件 script 節點（保留 in-flight）→ 依 manifest rev 與 per-effect viewerRev 以 ?v= cache-busting 注入帶 data-rtx-effect／data-rtx-rev 標記的 viewer.js（內容未變者 ETag 304 重驗證）；不清除 active effects
     C->>C: reloadEffectsTable：POST /api/effects/reload → GET /api/effects → loadConsolePlugins（pruneConsolePlugins 移除已完成舊插件 script 節點後注入新節點）→ renderEffects
     C->>C: 選特效 → selectEffect() → renderParams()
     C->>C: 點擊 → paramsFor() 讀取 rtx-p-* 輸入
@@ -271,10 +271,12 @@ classDiagram
     }
     class StaticFiles {
         <<server/static_files.py>>
-        +file_response(path, media_type, detail)
-        +effect_asset(effect_id, filename, client)
+        +file_response(path, media_type, detail, request)
+        +effect_asset(effect_id, filename, client, request)
         +examples_enabled()
         +examples_response(path)
+        +_etag_matches(if_none_match, etag)
+        +_conditional(response, request)
     }
     class Logging {
         <<server/logging.py>>
@@ -412,7 +414,7 @@ classDiagram
 ```mermaid
 flowchart LR
     TF["tests/fixtures/effects.json＋effects-v2.json<br/>v1／v2 測試 manifest"]
-    TA["tests/test_api.py<br/>pytest＋TestClient（61）<br/>v1／v2 fixture manifest、enabled filtering、layout 正規化、disabled-in-layout 過濾回歸、SSE manifest 結構、temp reload manifest、caplog 事件 log（broadcast／SSE／rate_limited／auth_denied／manifest／params_fallback／asset_missing）"] --> M["server/main.py<br/>＋server/config.py、security.py、params.py、relay.py、static_files.py、effects.py"]
+    TA["tests/test_api.py<br/>pytest＋TestClient（63）<br/>v1／v2 fixture manifest、enabled filtering、layout 正規化、disabled-in-layout 過濾回歸、SSE manifest 結構、per-effect viewerRev／consoleRev（sha256）、靜態資產 ETag＋If-None-Match 304 條件請求、temp reload manifest、caplog 事件 log（broadcast／SSE／rate_limited／auth_denied／manifest／params_fallback／asset_missing）"] --> M["server/main.py<br/>＋server/config.py、security.py、params.py、relay.py、static_files.py、effects.py"]
     TA --> TF
     TED["tests/test_editor_api.py<br/>pytest＋TestClient（85）<br/>tmp v2 manifest、GET/PUT manifest（baseRev 409、未變更 no-op、rollback、deleteRemoved list[str] 只刪列出 removed ids／忽略非 removed）、effect 刪除、viewer/console 檔讀寫刪除、新特效模板、export zip（ids 非空→effects.json 子集、ids 空→完整 manifest）、import zip（zip slip、too large、rollback）、subset export round-trip（匯出片段→移除特效→匯入還原）、.backup/&lt;timestamp&gt;/ 目錄備份（修改前 manifest＋受影響插件檔、PUT/DELETE 檔案端點觸發、無變更不備份、保留 5）、static 404、空檔內容（viewer.js 不可空→400／console.js 可空→200，B6 6u）、PUT 檔案內容 1MB 上限→413（S2 6x）、caplog editor_* 事件"] --> M
     TED --> TF
@@ -424,7 +426,7 @@ flowchart LR
     TG["tests/test_effect_catalog.mjs<br/>node --test＋vm（2）<br/>正式 effects/effects.json、effects/*/viewer.js、選用 console.js"] --> S_REAL["正式 effects/（effects.json＋*/viewer.js＋選用 console.js）"]
     TG --> K
     TEX["tests/test_editor.mjs<br/>node --test＋vm fake DOM（128）<br/>manifest 載入/chips/連線（badge 過渡態＋SSE 斷流不轉紅/streamOk 獨立）、v1/v2/disabled 分區、srvKey＋X-Access-Key、dirty＋beforeunload、重載（429 重試）、meta/params 編輯保存（409/429）、批次/拖曳/新增/移除 staged、列表就地協調、待刪除/已刪除專屬區、code 區 staged/匯入匯出/格式檢查/語法高亮（6v）、結果區合併（#ed-ops-result，6w）、復原待刪衝突（6x）、預覽前危險 API 預警（6y）、scroll 同步 transform（6z）、批次列常顯示＋結果訊息中文化（7b）、拖曳把柄限 grip（7c）、#ed-dirty 四態＋[保存至伺服器] confirm（7d）、preview timeline（7e）＋timeline UX（7f）＋播放期間不顯示 marker（7g）＋transport 圖示（7h）＋[清屏] >| 圖示（7i）、color 參數顏色選取器（7j）、array 參數子項列（7k）"]
-    TP["tests/e2e/*.spec.js<br/>Playwright E2E（87）<br/>預設 webServer port 8123（stdout/stderr→e2e-server.log、RTX_EFFECTS_DIR→tmp/e2e-effects（pre-server-copy.mjs 自 tests/fixtures/ 複製 4 特效、不碰正式 effects/、globalTeardown 清理））<br/>editor.spec.js（59）：/editor 全功能（manifest 載入/重載/SSE、meta/params 編輯保存與 409、批次、新增特效（effect_id 欄位）、zip 匯入匯出、代碼編輯＋語法高亮、即時預覽＋timeline、[測試特效]、簡化 console 面板、格式檢查、狀態指標、待刪除/已刪除專屬區）<br/>fx-layout.spec.js（13）：console 雙區拖曳/FLIP 動畫/localStorage<br/>fx-drag-trigger-distance.spec.js（1）：8 方向 pointer 拖曳觸發距離<br/>fx-button-counts.spec.js（1）：console 按鈕數<br/>reload-manifest.spec.js（1）：viewer 自動更新＋console 手動重載<br/>multi-console-reload.spec.js（1）：多 console 獨立重載＋selected fallback<br/>effect-params.spec.js（4）：參數輸入送 POST body、editable:false 不渲染<br/>console-viewer-flow.spec.js（1）：console 點擊送 viewer＋clear 重置<br/>examples-smoke.spec.js（5）：examples 頁 smoke test<br/>examples-theme-toggle.spec.js（1）：light/dark 主題切換＋persistence"]
+    TP["tests/e2e/*.spec.js<br/>Playwright E2E（87）<br/>預設 webServer port 8123（stdout/stderr→e2e-server.log、RTX_EFFECTS_DIR→tmp/e2e-effects（pre-server-copy.mjs 自 tests/fixtures/ 複製 4 特效、不碰正式 effects/、globalTeardown 清理））<br/>editor.spec.js（59）：/editor 全功能（manifest 載入/重載/SSE、meta/params 編輯保存與 409、批次、新增特效（effect_id 欄位）、zip 匯入匯出、代碼編輯＋語法高亮、即時預覽＋timeline、[測試特效]、簡化 console 面板、格式檢查、狀態指標、待刪除/已刪除專屬區）<br/>fx-layout.spec.js（13）：console 雙區拖曳/FLIP 動畫/localStorage<br/>fx-drag-trigger-distance.spec.js（1）：8 方向 pointer 拖曳觸發距離<br/>fx-button-counts.spec.js（1）：console 按鈕數<br/>reload-manifest.spec.js（1）：viewer 自動更新＋console 手動重載（ETag 條件請求：未變資產 304、內容變更 200＋新 rev）<br/>multi-console-reload.spec.js（1）：多 console 獨立重載＋selected fallback<br/>effect-params.spec.js（4）：參數輸入送 POST body、editable:false 不渲染<br/>console-viewer-flow.spec.js（1）：console 點擊送 viewer＋clear 重置<br/>examples-smoke.spec.js（5）：examples 頁 smoke test<br/>examples-theme-toggle.spec.js（1）：light/dark 主題切換＋persistence"]
     TP --> K
     TP --> S
     TP --> TF
