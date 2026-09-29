@@ -1738,6 +1738,173 @@ test.describe('U15 簡化 console（mini-console）', () => {
   });
 });
 
+test.describe('S1 插件 script 節點計數穩定（memory governance）', () => {
+  let fixtureBytes = null;
+  let viewerBytes = null;
+
+  test.beforeAll(async () => {
+    fixtureBytes = snapshotFixture();
+    viewerBytes = readFileSync(VIEWER_JS_PATH, 'utf8');
+  });
+
+  test.afterEach(async ({ page }) => {
+    restoreFixture(fixtureBytes);
+    writeFileSync(VIEWER_JS_PATH, viewerBytes);
+    await waitRateLimit();
+    await page.request.post('/api/effects/reload');
+  });
+
+  test('重覆預覽／存檔／rev 變化：body 與 head 的 script[data-rtx-effect] 不累積', async ({
+    page,
+  }) => {
+    const errs = trackPageErrors(page);
+    await page.addInitScript(() => {
+      window.__rtxWinErrors = [];
+      window.addEventListener('error', (e) => {
+        const bodyNode = document.body.querySelector('script[data-rtx-effect]');
+        const headNode = document.head.querySelector('script[data-rtx-effect]');
+        window.__rtxWinErrors.push({
+          message: e.message,
+          filename: e.filename,
+          lineno: e.lineno,
+          colno: e.colno,
+          stack: e.error && e.error.stack,
+          bodySrc: bodyNode && bodyNode.src,
+          headSrc: headNode && headNode.src,
+          bodyCount: document.body.querySelectorAll('script[data-rtx-effect]').length,
+          headCount: document.head.querySelectorAll('script[data-rtx-effect]').length,
+          t: Date.now(),
+        });
+      });
+    });
+    await waitRateLimit();
+    writeFixture(v2Fixture(readFixture()));
+    await page.request.post('/api/effects/reload');
+    await openEditorPage(page);
+    await installCreateRecorder(page);
+
+    const bodyMarked = () =>
+      page.evaluate(() => document.body.querySelectorAll('script[data-rtx-effect]').length);
+    const headMarked = () =>
+      page.evaluate(() => document.head.querySelectorAll('script[data-rtx-effect]').length);
+    const bodyRev = () =>
+      page.evaluate(
+        () => document.body.querySelector('script[data-rtx-effect]')?.getAttribute('data-rtx-rev')
+      );
+    const phaseMarks = [];
+    const markPhase = (label) => phaseMarks.push({ label, t: Date.now() });
+    const phaseAt = (t) => {
+      let cur = 'setup';
+      for (const m of phaseMarks) if (t >= m.t) cur = m.label;
+      return cur;
+    };
+
+    // 首次預覽：body 1 標記（particle）、head 1 標記（console）、core 未標記
+    markPhase('A 首次預覽');
+    const r1 = page.waitForResponse((r) => r.url().includes('/effects/particle/viewer.js'));
+    await page.locator('#ed-preview-start').click();
+    await r1;
+    await expect(await page.evaluate(() => window.__rtxEditor.preview.running)).toBe(true);
+    await expect.poll(bodyMarked).toBe(1);
+    await expect.poll(headMarked).toBe(1);
+    const coreCount = await page.evaluate(() =>
+      Array.from(document.body.querySelectorAll('script')).filter(
+        (s) => !s.hasAttribute('data-rtx-effect') && /\/viewer\/effects\.js(\?|$)/.test(s.src)
+      ).length
+    );
+    expect(coreCount).toBe(1);
+    const rev1 = await bodyRev();
+    expect(rev1).toMatch(/^[0-9a-f]{64}$/);
+
+    // 停止＋再預覽：節點取代、計數不變、同 rev
+    markPhase('B 再預覽');
+    await page.locator('#ed-preview-clear').click();
+    await expect(await page.evaluate(() => window.__rtxEditor.preview.running)).toBe(false);
+    const r2 = page.waitForResponse((r) => r.url().includes('/effects/particle/viewer.js'));
+    await page.locator('#ed-preview-start').click();
+    await r2;
+    await expect(await page.evaluate(() => window.__rtxEditor.preview.running)).toBe(true);
+    expect(await bodyMarked()).toBe(1);
+    expect(await headMarked()).toBe(1);
+    expect(await bodyRev()).toBe(rev1);
+
+    // 暫停（保留 running=true、凍結特效，避免 1200ms 結束自動停導致 onCodeSaved 走「不重預覽」分支）
+    markPhase('C 暫停＋存檔');
+    await page.locator('#ed-preview-pause').click();
+    await expect(await page.evaluate(() => window.__rtxEditor.preview.paused)).toBe(true);
+    await expect(await page.evaluate(() => window.__rtxEditor.preview.running)).toBe(true);
+
+    // 暫存 viewer 代碼→[保存] PUT→onCodeSaved 重預覽：計數不變、rev 更新
+    const codeFetch = page.waitForResponse((r) =>
+      r.url().includes('/api/editor/effect/particle/viewer.js')
+    );
+    await page.locator('#ed-tabs .tab[data-tab="viewer"]').click();
+    await codeFetch;
+    const code = page.locator('#ed-code');
+    // loadCodeFile 為 async：等編輯框確為 viewer.js 內容（避免讀到 effects.json 的舊內容）
+    // server read_text() universal-newlines：CRLF→LF，與磁碟 bytes 不同
+    const viewerCode = viewerBytes.replace(/\r\n/g, '\n');
+    await expect.poll(async () => code.inputValue()).toBe(viewerCode);
+    await code.fill(viewerCode + '\n// s1-e2e staged\n');
+    await page.locator('#ed-save-file').click();
+    // 切回 manifest tab：onCodeSaved 走伺服器抓取重注入路徑（script 節點取代、rev 更新）
+    await page.locator('#ed-tabs .tab[data-tab="manifest"]').click();
+    page.on('dialog', (d) => d.accept());
+    await waitRateLimit();
+    const put = page.waitForResponse(
+      (r) => r.url().includes('/api/editor/manifest') && r.request().method() === 'PUT' && r.ok()
+    );
+    await page.locator('#ed-save-btn').click();
+    await put;
+    await expect(page.locator('#ed-dirty')).toHaveText('已同步');
+    await expect
+      .poll(async () => page.evaluate(() => window.__rtxEditor.preview.running))
+      .toBe(true);
+    await expect
+      .poll(async () => {
+        const r = await bodyRev();
+        return r && r !== rev1 ? r : null;
+      })
+      .not.toBe(null);
+    expect(await bodyMarked()).toBe(1);
+    expect(await headMarked()).toBe(1);
+    const revC = await bodyRev();
+    expect(revC).toMatch(/^[0-9a-f]{64}$/);
+
+    // 外部改 viewer.js＋[重載]→rev 再變：再預覽、計數不變、rev 更新
+    markPhase('D 外部改檔＋重載');
+    await waitRateLimit();
+    writeFileSync(VIEWER_JS_PATH, viewerBytes + '\n// s1-e2e ext\n');
+    const reloadResp = page.waitForResponse(
+      (r) => r.url().includes('/api/effects/reload') && r.request().method() === 'POST' && r.ok()
+    );
+    await page.locator('#ed-reload-btn').click();
+    const rr = await reloadResp;
+    expect(rr.status()).toBe(200);
+    const r3 = page.waitForResponse((r) => r.url().includes('/effects/particle/viewer.js'));
+    await page.locator('#ed-preview-clear').click();
+    await page.locator('#ed-preview-start').click();
+    await r3;
+    await expect(await page.evaluate(() => window.__rtxEditor.preview.running)).toBe(true);
+    expect(await bodyMarked()).toBe(1);
+    expect(await headMarked()).toBe(1);
+    const rev2 = await bodyRev();
+    expect(rev2).toMatch(/^[0-9a-f]{64}$/);
+    expect(rev2).not.toBe(revC);
+    const winErrors = await page.evaluate(() => window.__rtxWinErrors);
+    expect(
+      errs,
+      [
+        ...errs.map((e) => (e && (e.stack || e.message)) || String(e)),
+        '--- window error events ---',
+        ...winErrors.map((w) =>
+          JSON.stringify({ ...w, phase: phaseAt(w.t) })
+        ),
+      ].join('\n')
+    ).toEqual([]);
+  });
+});
+
 test.describe('5r 測試特效（單個特效測試）', () => {
   test('v1：[測試特效] → 真實插件實際運行、結果顯示於預覽面板結果區', async ({ page }) => {
     const errs = trackPageErrors(page);

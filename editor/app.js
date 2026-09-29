@@ -2910,14 +2910,38 @@
     return Date.now();
   }
 
-  function loadScript(src) {
+  var inflightPreviewScripts = {};
+
+  function prunePreviewScripts() {
+    var nodes = document.body.querySelectorAll('script[data-rtx-effect]');
+    for (var i = 0; i < nodes.length; i++) {
+      var pid = nodes[i].getAttribute('data-rtx-effect');
+      if (nodes[i] !== inflightPreviewScripts[pid]) nodes[i].remove();
+    }
+  }
+
+  function loadScript(src, effectId, rev) {
     return new Promise(function (resolve, reject) {
       var s = document.createElement('script');
-      s.src = src + (src.indexOf('?') >= 0 ? '&' : '?') + 't=' + nowMs();
+      if (effectId) {
+        s.setAttribute('data-rtx-effect', effectId);
+        s.setAttribute('data-rtx-rev', rev || '');
+        prunePreviewScripts();
+        inflightPreviewScripts[effectId] = s;
+      }
+      var suffix;
+      if (effectId && rev) {
+        suffix = '?v=' + encodeURIComponent(rev);
+      } else {
+        suffix = (src.indexOf('?') >= 0 ? '&' : '?') + 't=' + nowMs();
+      }
+      s.src = src + suffix;
       s.onload = function () {
+        if (effectId && inflightPreviewScripts[effectId] === s) delete inflightPreviewScripts[effectId];
         resolve();
       };
       s.onerror = function () {
+        if (effectId && inflightPreviewScripts[effectId] === s) delete inflightPreviewScripts[effectId];
         reject(new Error('script load failed: ' + src));
       };
       document.body.appendChild(s);
@@ -2926,19 +2950,36 @@
 
   var pluginCache = {};
 
+  var inflightConsolePlugins = {};
+
+  function pruneConsolePlugins() {
+    var nodes = (document.head || document.body).querySelectorAll('script[data-rtx-effect]');
+    for (var i = 0; i < nodes.length; i++) {
+      var pid = nodes[i].getAttribute('data-rtx-effect');
+      if (nodes[i] !== inflightConsolePlugins[pid]) nodes[i].remove();
+    }
+  }
+
   function loadConsolePlugin(id, spec, rev) {
-    var key = id + '\u0000' + (rev || '');
+    var effRev = (spec && spec.consoleRev) || rev || '';
+    var key = id + '\u0000' + effRev;
     if (pluginCache[key]) return pluginCache[key];
     var file = (spec && spec.console) || 'console.js';
     var url = '/effects/' + id + '/' + file;
-    var suffix = rev ? '?v=' + encodeURIComponent(rev) : '';
+    var suffix = effRev ? '?v=' + encodeURIComponent(effRev) : '';
     var p = new Promise(function (resolve) {
       var s = document.createElement('script');
       s.src = url + suffix;
+      s.setAttribute('data-rtx-effect', id);
+      s.setAttribute('data-rtx-rev', effRev);
+      pruneConsolePlugins();
+      inflightConsolePlugins[id] = s;
       s.onload = function () {
+        if (inflightConsolePlugins[id] === s) delete inflightConsolePlugins[id];
         resolve(true);
       };
       s.onerror = function () {
+        if (inflightConsolePlugins[id] === s) delete inflightConsolePlugins[id];
         console.warn('[editor] console 插件載入失敗，icon 回退既有優先序', url + suffix);
         resolve(false);
       };
@@ -3005,8 +3046,9 @@
     }
     var spec = state.manifest && state.manifest.effects ? state.manifest.effects[id] : null;
     if (!spec) return false;
+    var effRev = spec.viewerRev || state.rev || '';
     try {
-      await loadScript('/effects/' + id + '/' + effectViewerFile(spec));
+      await loadScript('/effects/' + id + '/' + effectViewerFile(spec), id, effRev);
     } catch (e) {
       return false;
     }
