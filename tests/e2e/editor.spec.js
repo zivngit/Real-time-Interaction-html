@@ -1754,14 +1754,13 @@ test.describe('S1 插件 script 節點計數穩定（memory governance）', () =
     await page.request.post('/api/effects/reload');
   });
 
-  test('重覆預覽／存檔／rev 變化：body 與 head 的 script[data-rtx-effect] 不累積', async ({
+  test('重覆預覽／存檔／rev 變化：E2 不注入 body script、head 不累積、同 rev 免重複 request', async ({
     page,
   }) => {
     const errs = trackPageErrors(page);
     await page.addInitScript(() => {
       window.__rtxWinErrors = [];
       window.addEventListener('error', (e) => {
-        const bodyNode = document.body.querySelector('script[data-rtx-effect]');
         const headNode = document.head.querySelector('script[data-rtx-effect]');
         window.__rtxWinErrors.push({
           message: e.message,
@@ -1769,9 +1768,7 @@ test.describe('S1 插件 script 節點計數穩定（memory governance）', () =
           lineno: e.lineno,
           colno: e.colno,
           stack: e.error && e.error.stack,
-          bodySrc: bodyNode && bodyNode.src,
           headSrc: headNode && headNode.src,
-          bodyCount: document.body.querySelectorAll('script[data-rtx-effect]').length,
           headCount: document.head.querySelectorAll('script[data-rtx-effect]').length,
           t: Date.now(),
         });
@@ -1783,14 +1780,27 @@ test.describe('S1 插件 script 節點計數穩定（memory governance）', () =
     await openEditorPage(page);
     await installCreateRecorder(page);
 
+    // E2：preview plugin 走 fetch 文字＋new Function（不注入 body <script data-rtx-effect>）
+    const effectGets = [];
+    page.on('response', (r) => {
+      const u = r.url();
+      if (u.includes('/effects/particle/viewer.js') && !u.includes('/api/')) effectGets.push(u);
+    });
     const bodyMarked = () =>
       page.evaluate(() => document.body.querySelectorAll('script[data-rtx-effect]').length);
     const headMarked = () =>
       page.evaluate(() => document.head.querySelectorAll('script[data-rtx-effect]').length);
-    const bodyRev = () =>
-      page.evaluate(
-        () => document.body.querySelector('script[data-rtx-effect]')?.getAttribute('data-rtx-rev')
+    const coreCount = () =>
+      page.evaluate(() =>
+        Array.from(document.body.querySelectorAll('script')).filter(
+          (s) => !s.hasAttribute('data-rtx-effect') && /\/viewer\/effects\.js(\?|$)/.test(s.src)
+        ).length
       );
+    // E2 fetch URL 用 effRev = spec.viewerRev || state.rev；server manifest entry 無 per-effect rev
+    // → 實際以 state.rev（catalog fingerprint，含檔案 hash）為 ?v=
+    const manifestRev = () => page.evaluate(() => window.__rtxEditor.state.rev);
+
+    // 每 phase 前打時間戳：若出現 429，對照該 phase 的 request 判斷是否觸發 rate limit
     const phaseMarks = [];
     const markPhase = (label) => phaseMarks.push({ label, t: Date.now() });
     const phaseAt = (t) => {
@@ -1799,34 +1809,32 @@ test.describe('S1 插件 script 節點計數穩定（memory governance）', () =
       return cur;
     };
 
-    // 首次預覽：body 1 標記（particle）、head 1 標記（console）、core 未標記
+    // 首次預覽：fetch ?v=manifest rev、body 無標記節點、head 1（console）、core 1 未標記
     markPhase('A 首次預覽');
     const r1 = page.waitForResponse((r) => r.url().includes('/effects/particle/viewer.js'));
     await page.locator('#ed-preview-start').click();
     await r1;
     await expect(await page.evaluate(() => window.__rtxEditor.preview.running)).toBe(true);
-    await expect.poll(bodyMarked).toBe(1);
+    await expect.poll(bodyMarked).toBe(0);
     await expect.poll(headMarked).toBe(1);
-    const coreCount = await page.evaluate(() =>
-      Array.from(document.body.querySelectorAll('script')).filter(
-        (s) => !s.hasAttribute('data-rtx-effect') && /\/viewer\/effects\.js(\?|$)/.test(s.src)
-      ).length
-    );
-    expect(coreCount).toBe(1);
-    const rev1 = await bodyRev();
-    expect(rev1).toMatch(/^[0-9a-f]{64}$/);
+    expect(await coreCount()).toBe(1);
+    const revA = await manifestRev();
+    expect(revA).toMatch(/^[0-9a-f]{64}$/);
+    expect(effectGets).toHaveLength(1);
+    expect(effectGets[0].endsWith('/effects/particle/viewer.js?v=' + revA)).toBe(true);
+    // plugin 在真實 browser 執行成功：registry 已註冊＋codeCache rev 已記
+    expect(await page.evaluate(() => typeof window.Effects.registry.particle)).toBe('function');
+    expect(await page.evaluate(() => window.__rtxEditor.codeCache['particle/viewer.js'].rev)).toBe(revA);
 
-    // 停止＋再預覽：節點取代、計數不變、同 rev
+    // 停止＋再預覽：同 rev→codeCache 命中、無新 request、body 仍無節點
     markPhase('B 再預覽');
     await page.locator('#ed-preview-clear').click();
     await expect(await page.evaluate(() => window.__rtxEditor.preview.running)).toBe(false);
-    const r2 = page.waitForResponse((r) => r.url().includes('/effects/particle/viewer.js'));
     await page.locator('#ed-preview-start').click();
-    await r2;
     await expect(await page.evaluate(() => window.__rtxEditor.preview.running)).toBe(true);
-    expect(await bodyMarked()).toBe(1);
+    expect(effectGets).toHaveLength(1, '同 rev 不應重複 request');
+    expect(await bodyMarked()).toBe(0);
     expect(await headMarked()).toBe(1);
-    expect(await bodyRev()).toBe(rev1);
 
     // 暫停（保留 running=true、凍結特效，避免 1200ms 結束自動停導致 onCodeSaved 走「不重預覽」分支）
     markPhase('C 暫停＋存檔');
@@ -1834,20 +1842,16 @@ test.describe('S1 插件 script 節點計數穩定（memory governance）', () =
     await expect(await page.evaluate(() => window.__rtxEditor.preview.paused)).toBe(true);
     await expect(await page.evaluate(() => window.__rtxEditor.preview.running)).toBe(true);
 
-    // 暫存 viewer 代碼→[保存] PUT→onCodeSaved 重預覽：計數不變、rev 更新
-    const codeFetch = page.waitForResponse((r) =>
-      r.url().includes('/api/editor/effect/particle/viewer.js')
-    );
+    // 暫存 viewer 代碼→[保存] PUT→onCodeSaved 重預覽：rev 變→重 fetch
     await page.locator('#ed-tabs .tab[data-tab="viewer"]').click();
-    await codeFetch;
     const code = page.locator('#ed-code');
-    // loadCodeFile 為 async：等編輯框確為 viewer.js 內容（避免讀到 effects.json 的舊內容）
-    // server read_text() universal-newlines：CRLF→LF，與磁碟 bytes 不同
-    const viewerCode = viewerBytes.replace(/\r\n/g, '\n');
-    await expect.poll(async () => code.inputValue()).toBe(viewerCode);
-    await code.fill(viewerCode + '\n// s1-e2e staged\n');
+    // loadCodeFile 為 async：E2 下 phase A 的 fetch 已寫 codeCache（revA、raw CRLF bytes）
+    // → 切 tab 走 cache 命中（無 API GET）、showCode 寫入 raw 內容；
+    // 但 HTML textarea 的 value setter 依規範將 CRLF 正規化為 LF，故 inputValue 比對 LF 版
+    await expect.poll(async () => code.inputValue()).toBe(viewerBytes.replace(/\r\n/g, '\n'));
+    await code.fill(viewerBytes.replace(/\r\n/g, '\n') + '\n// s1-e2e staged\n');
     await page.locator('#ed-save-file').click();
-    // 切回 manifest tab：onCodeSaved 走伺服器抓取重注入路徑（script 節點取代、rev 更新）
+    // 切回 manifest tab：onCodeSaved 走 null content→E2 fetch 路徑（rev 更新→重抓）
     await page.locator('#ed-tabs .tab[data-tab="manifest"]').click();
     page.on('dialog', (d) => d.accept());
     await waitRateLimit();
@@ -1860,46 +1864,61 @@ test.describe('S1 插件 script 節點計數穩定（memory governance）', () =
     await expect
       .poll(async () => page.evaluate(() => window.__rtxEditor.preview.running))
       .toBe(true);
+    // loadManifest（PUT 成功後）先更新 state.rev，再 onCodeSaved 重預覽
+    // 注意：await expect.poll(...).not.toBe(null) 是斷言、會 resolve undefined（非被 poll 的值）
+    // → 先 poll 等待 rev 變化，再獨立讀取實際值
     await expect
       .poll(async () => {
-        const r = await bodyRev();
-        return r && r !== rev1 ? r : null;
+        const r = await manifestRev();
+        return r && r !== revA ? r : null;
       })
       .not.toBe(null);
-    expect(await bodyMarked()).toBe(1);
-    expect(await headMarked()).toBe(1);
-    const revC = await bodyRev();
+    const revC = await manifestRev();
     expect(revC).toMatch(/^[0-9a-f]{64}$/);
+    // rev 變化→重 fetch（新 ?v=）、codeCache 更新
+    await expect.poll(async () => effectGets.length).toBe(2);
+    expect(effectGets[1].endsWith('/effects/particle/viewer.js?v=' + revC)).toBe(true);
+    expect(await bodyMarked()).toBe(0);
+    expect(await headMarked()).toBe(1);
+    expect(await coreCount()).toBe(1);
+    expect(await page.evaluate(() => window.__rtxEditor.codeCache['particle/viewer.js'].rev)).toBe(revC);
 
-    // 外部改 viewer.js＋[重載]→rev 再變：再預覽、計數不變、rev 更新
+    // 外部改 viewer.js＋[重載]→catalog rev 再變：再預覽拿最新 rev（重 fetch）
     markPhase('D 外部改檔＋重載');
     await waitRateLimit();
-    writeFileSync(VIEWER_JS_PATH, viewerBytes + '\n// s1-e2e ext\n');
+    const extBytes = viewerBytes + '\n// s1-e2e ext\n';
+    writeFileSync(VIEWER_JS_PATH, extBytes);
     const reloadResp = page.waitForResponse(
       (r) => r.url().includes('/api/effects/reload') && r.request().method() === 'POST' && r.ok()
     );
     await page.locator('#ed-reload-btn').click();
     const rr = await reloadResp;
     expect(rr.status()).toBe(200);
-    const r3 = page.waitForResponse((r) => r.url().includes('/effects/particle/viewer.js'));
+    // reload 後 loadManifest 更新 state.rev（fingerprint 含檔案 hash→必變）
+    // 同上：poll 僅作等待斷言，實際值另行讀取
+    await expect
+      .poll(async () => {
+        const r = await manifestRev();
+        return r && r !== revC ? r : null;
+      })
+      .not.toBe(null);
+    const revD = await manifestRev();
+    expect(revD).toMatch(/^[0-9a-f]{64}$/);
     await page.locator('#ed-preview-clear').click();
     await page.locator('#ed-preview-start').click();
-    await r3;
+    await expect.poll(async () => effectGets.length).toBe(3);
+    expect(effectGets[2].endsWith('/effects/particle/viewer.js?v=' + revD)).toBe(true);
     await expect(await page.evaluate(() => window.__rtxEditor.preview.running)).toBe(true);
-    expect(await bodyMarked()).toBe(1);
+    expect(await bodyMarked()).toBe(0);
     expect(await headMarked()).toBe(1);
-    const rev2 = await bodyRev();
-    expect(rev2).toMatch(/^[0-9a-f]{64}$/);
-    expect(rev2).not.toBe(revC);
+    expect(await coreCount()).toBe(1);
     const winErrors = await page.evaluate(() => window.__rtxWinErrors);
     expect(
       errs,
       [
         ...errs.map((e) => (e && (e.stack || e.message)) || String(e)),
         '--- window error events ---',
-        ...winErrors.map((w) =>
-          JSON.stringify({ ...w, phase: phaseAt(w.t) })
-        ),
+        ...winErrors.map((w) => JSON.stringify({ ...w, phase: phaseAt(w.t) })),
       ].join('\n')
     ).toEqual([]);
   });

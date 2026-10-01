@@ -587,6 +587,8 @@ function makeEnv(opts = {}) {
     putSeq: (opts.putSeq || []).map((r) => JSON.parse(JSON.stringify(r))),
     fileGet: Object.assign({ status: 200 }, opts.fileGet ? JSON.parse(JSON.stringify(opts.fileGet)) : {}),
     fileGetSeq: (opts.fileGetSeq || []).map((r) => JSON.parse(JSON.stringify(r))),
+    effectGet: Object.assign({ status: 200 }, opts.effectGet ? JSON.parse(JSON.stringify(opts.effectGet)) : {}),
+    effectGetSeq: (opts.effectGetSeq || []).map((r) => JSON.parse(JSON.stringify(r))),
     fileTemplate: opts.fileTemplate ? JSON.parse(JSON.stringify(opts.fileTemplate)) : {},
     filePutSeq: (opts.filePutSeq || []).map((r) => JSON.parse(JSON.stringify(r))),
     importSeq: (opts.importSeq || []).map((r) => JSON.parse(JSON.stringify(r))),
@@ -622,6 +624,10 @@ function makeEnv(opts = {}) {
     }
     if (method === 'GET' && /^\/api\/editor\/effect\/[^/]+\/(viewer|console)\.js$/.test(String(url))) {
       const r = env.fileGetSeq.length ? env.fileGetSeq.shift() : env.fileGet;
+      return makeRes(r.status, r.headers || {}, r.payload);
+    }
+    if (method === 'GET' && /^\/effects\/[^/]+\/(viewer|console)\.js(\?.*)?$/.test(String(url))) {
+      const r = env.effectGetSeq.length ? env.effectGetSeq.shift() : env.effectGet;
       return makeRes(r.status, r.headers || {}, r.payload);
     }
     if (method === 'GET' && /^\/api\/editor\/effect\/[^/]+\/(viewer|console)\.js\?template=true$/.test(String(url))) {
@@ -1657,8 +1663,11 @@ test('3a 匯出：vm 無 Blob/URL → 顯示提示', async () => {
   assert.ok(els.opsResult.classList.contains('err'));
 });
 
-test('3b previewStart：載入 plugin（bodyScripts 注入）、loadedId、createEffect 座標與參數、running、label/hint', async () => {
-  const env = await loadEnv({ manifest: M3 });
+test('3b previewStart：載入 plugin（E2 fetch 文字＋new Function）、loadedId、createEffect 座標與參數、running、label/hint', async () => {
+  const env = await loadEnv({
+    manifest: M3,
+    effectGet: { status: 200, payload: 'window.__fxPreviewRan = "fx-a";' }
+  });
   const ed = env.window.__rtxEditor;
   const els = env.els;
   const { calls } = makeFakeEffects(env);
@@ -1675,9 +1684,13 @@ test('3b previewStart：載入 plugin（bodyScripts 注入）、loadedId、creat
   assert.ok(calls[0].fx);
   assert.equal(ed.preview.running, true);
   assert.equal(ed.preview.loadedId, 'fx-a');
-  const scripts = bodyScripts(env);
-  assert.equal(scripts.length, 1);
-  assert.ok(scripts[0].src.startsWith('/effects/fx-a/viewer.js?'));
+  assert.equal(bodyScripts(env).length, 0, 'E2：preview plugin 不注入 body <script>');
+  const fxGet = env.fetchCalls.find(
+    (c) => c.method === 'GET' && c.url === '/effects/fx-a/viewer.js?v=' + 'c'.repeat(64)
+  );
+  assert.ok(fxGet, 'E2：fetch /effects/fx-a/viewer.js?v=<state.rev>');
+  assert.equal(env.window.__fxPreviewRan, 'fx-a', 'E2：plugin 經 new Function 執行');
+  assert.equal(ed.codeCache['fx-a/viewer.js'].rev, 'c'.repeat(64), 'E2：codeCache 寫入 rev');
   assert.equal(els.previewLabel.textContent, 'Alpha（選定）· 800×450');
   assert.equal(els.previewHint.textContent, 'Alpha（選定）· x=50, y=50');
   ed.previewStop(true);
@@ -2483,7 +2496,7 @@ test('3b [保存] 自動重載：running 重預覽、stopped 重新注入 plugin
   els.saveBtn._fire('click', {});
   await settle(12);
   assert.equal(calls.length, 2);
-  assert.equal(bodyScripts(env).length, 1, 'S1：重預覽同 id 取代舊 script，不疊加');
+  assert.equal(bodyScripts(env).length, 0, 'E2：重預覽同 id 不注入 body script');
   assert.equal(ed.preview.running, true);
   assert.equal(ed.preview.loadedId, 'fx-a');
 
@@ -2492,7 +2505,7 @@ test('3b [保存] 自動重載：running 重預覽、stopped 重新注入 plugin
   els.saveBtn._fire('click', {});
   await settle(12);
   assert.equal(calls.length, 2);
-  assert.equal(bodyScripts(env).length, 1, 'S1：停止後重新注入同 id 取代舊 script，不疊加');
+  assert.equal(bodyScripts(env).length, 0, 'E2：停止後重新注入同 id 不注入 body script');
   assert.equal(ed.preview.loadedId, 'fx-a');
 
   const itemB = els.zoneAlt.querySelectorAll('.fx-item')[0];
@@ -2502,7 +2515,7 @@ test('3b [保存] 自動重載：running 重預覽、stopped 重新注入 plugin
   els.saveBtn._fire('click', {});
   await settle(12);
   assert.equal(calls.length, 2);
-  assert.equal(bodyScripts(env).length, 1);
+  assert.equal(bodyScripts(env).length, 0);
   ed.previewStop(true);
 });
 
@@ -3539,7 +3552,7 @@ test('5f 保存後新特效：載入其 console.js 插件（mini-console 按需�
   );
 });
 
-test('S1 preview 插件 script：?v=viewerRev（fallback state.rev）、id/rev 標記、同 id 重注入不新增節點、core 未標記', async () => {
+test('S1 preview plugin（E2）：fetch 文字＋new Function、?v=viewerRev（fallback state.rev）、不注入 body script、同 rev 免 request、rev 變化重 fetch', async () => {
   const env = await loadEnv({
     manifest: {
       rev: 'a2'.repeat(32),
@@ -3548,40 +3561,51 @@ test('S1 preview 插件 script：?v=viewerRev（fallback state.rev）、id/rev �
         effects: { 'fx-a': { label: 'Alpha', enabled: true, params: {}, viewerRev: 'v'.repeat(64) } },
         currentEffects: ['fx-a']
       }
-    }
+    },
+    effectGet: { status: 200, payload: 'window.__fxPreviewRan = (window.__fxPreviewRan || 0) + 1;' }
   });
   const ed = env.window.__rtxEditor;
+  const fxGets = () => env.fetchCalls.filter(
+    (c) => c.method === 'GET' && c.url.indexOf('/effects/fx-a/viewer.js') === 0
+  );
   const marked = () => env.doc.body.querySelectorAll('script[data-rtx-effect]');
   // core /viewer/effects.js 節點：loadScript 無標記（vm 中 fake script 不執行→手動 append 模擬）
   const core = env.doc.createElement('script');
   core.src = '/viewer/effects.js';
   env.doc.body.appendChild(core);
   makeFakeEffects(env);
-  // previewStart 真實路徑：plugin script 帶標記、?v=viewerRev
+  // previewStart 真實路徑：fetch ?v=viewerRev、new Function 執行、不注入 body script
   await ed.previewStart();
   assert.equal(ed.preview.loadedId, 'fx-a');
-  assert.equal(marked().length, 1);
-  assert.equal(marked()[0].getAttribute('data-rtx-effect'), 'fx-a');
-  assert.equal(marked()[0].getAttribute('data-rtx-rev'), 'v'.repeat(64));
-  assert.equal(marked()[0].src, '/effects/fx-a/viewer.js?v=' + 'v'.repeat(64));
-  // 同 id 重注入（onCodeSaved 路徑）：取代不疊加、core 節點不受影響
+  assert.equal(marked().length, 0, 'E2：不注入 body <script data-rtx-effect>');
+  assert.equal(fxGets().length, 1);
+  assert.equal(fxGets()[0].url, '/effects/fx-a/viewer.js?v=' + 'v'.repeat(64));
+  assert.equal(env.window.__fxPreviewRan, 1);
+  assert.equal(ed.codeCache['fx-a/viewer.js'].rev, 'v'.repeat(64));
+  // 同 id 同 rev 重注入（onCodeSaved 路徑）：cache 命中、無新 request、plugin 再執行
   await ed.injectPlugin('fx-a', null);
-  assert.equal(marked().length, 1, '同 id 重注入應取代舊節點');
-  assert.equal(marked()[0].src, '/effects/fx-a/viewer.js?v=' + 'v'.repeat(64));
-  // rev 變（模擬 manifest 更新）：取代舊節點、標記更新
+  assert.equal(fxGets().length, 1, 'E2：同 rev cache 命中免 request');
+  assert.equal(env.window.__fxPreviewRan, 2);
+  assert.equal(marked().length, 0);
+  // rev 變（模擬 manifest 更新）：重 fetch 新 rev
   ed.state.manifest.effects['fx-a'].viewerRev = 'w'.repeat(64);
   await ed.injectPlugin('fx-a', null);
-  assert.equal(marked().length, 1);
-  assert.equal(marked()[0].getAttribute('data-rtx-rev'), 'w'.repeat(64));
-  assert.equal(marked()[0].src, '/effects/fx-a/viewer.js?v=' + 'w'.repeat(64));
+  assert.equal(fxGets().length, 2);
+  assert.equal(fxGets()[1].url, '/effects/fx-a/viewer.js?v=' + 'w'.repeat(64));
+  assert.equal(ed.codeCache['fx-a/viewer.js'].rev, 'w'.repeat(64));
+  // 無 viewerRev：fallback state.rev
+  delete ed.state.manifest.effects['fx-a'].viewerRev;
+  await ed.injectPlugin('fx-a', null);
+  assert.equal(fxGets().length, 3);
+  assert.equal(fxGets()[2].url, '/effects/fx-a/viewer.js?v=' + 'a2'.repeat(32));
   // core 節點仍在（未標記，未被 prune）
   const all = env.doc.body.querySelectorAll('script');
-  assert.equal(all.length, 2);
-  assert.equal(all.find((s) => !s.getAttribute('data-rtx-effect')).src.startsWith('/viewer/effects.js'), true);
+  assert.equal(all.length, 1);
+  assert.ok(all[0].src.startsWith('/viewer/effects.js'));
   ed.previewStop(true);
 });
 
-test('S1 preview（body）與 mini-console（head）同 id 並存、各容器獨立 prune', async () => {
+test('S1 preview（E2 無 body 節點）與 mini-console（head）同 id 並存、各容器獨立 prune', async () => {
   const env = await loadEnv({ manifest: M2 });
   const ed = env.window.__rtxEditor;
   const revB = 'b'.repeat(64);
@@ -3589,13 +3613,12 @@ test('S1 preview（body）與 mini-console（head）同 id 並存、各容器獨
   await ed.loadConsolePlugin('fx-a', ed.state.manifest.effects['fx-a'], revB);
   const bodyMarked = env.doc.body.querySelectorAll('script[data-rtx-effect]');
   const headMarked = env.doc.head.querySelectorAll('script[data-rtx-effect]');
-  assert.equal(bodyMarked.length, 1, 'body preview 節點');
+  assert.equal(bodyMarked.length, 0, 'E2：preview 不注入 body script');
   assert.equal(headMarked.length, 1, 'head console 節點');
-  assert.equal(bodyMarked[0].getAttribute('data-rtx-effect'), 'fx-a');
   assert.equal(headMarked[0].getAttribute('data-rtx-effect'), 'fx-a');
-  // console 換新 rev 重載：只動 head，body preview 節點不受影響
+  // console 換新 rev 重載：只動 head
   await ed.loadConsolePlugin('fx-a', ed.state.manifest.effects['fx-a'], 'f'.repeat(64));
-  assert.equal(env.doc.body.querySelectorAll('script[data-rtx-effect]').length, 1);
+  assert.equal(env.doc.body.querySelectorAll('script[data-rtx-effect]').length, 0);
   assert.equal(env.doc.head.querySelectorAll('script[data-rtx-effect]').length, 1);
 });
 
@@ -3624,35 +3647,29 @@ test('S1 console 插件優先用 spec.consoleRev：cache key／?v=／節點標�
   assert.equal(headScripts(env)[0].src, '/effects/fx-c/ctl.js?v=' + 'c'.repeat(64));
 });
 
-test('S1 in-flight 節點保留：同 id 進行中不被 prune、完成後下次注入才移除', async () => {
-  const env = await loadEnv({ manifest: M2 });
+test('S1 preview fetch 失敗／語法錯誤：404 或 plugin 語法錯誤 → false、不設 loadedId', async () => {
+  const env = await loadEnv({
+    manifest: M2,
+    effectGetSeq: [
+      { status: 404, payload: null },
+      { status: 200, payload: 'window.__fxPreviewRan = 1;' },
+      { status: 200, payload: 'function ( {' }
+    ]
+  });
   const ed = env.window.__rtxEditor;
-  const origBodyAppend = env.doc.body.appendChild;
-  let slowNode = null;
-  let slowLoad = null;
-  env.doc.body.appendChild = (child) => {
-    const r = origBodyAppend(child);
-    if (child.tagName === 'SCRIPT' && String(child.src).indexOf('/effects/fx-a/viewer.js') === 0 && !slowNode) {
-      slowNode = child;
-      slowLoad = child.onload;
-      child.onload = null; // 模擬慢速網路：不自動 fire onload
-    }
-    return r;
-  };
-  const p1 = ed.injectPlugin('fx-a', null);
-  await settle(4);
-  assert.equal(env.doc.body.querySelectorAll('script[data-rtx-effect]').length, 1);
-  assert.equal(slowNode.getAttribute('data-rtx-effect'), 'fx-a');
-  // 同 id 再注入：in-flight 節點保留（不被 prune）、新增一節點
-  await ed.injectPlugin('fx-a', null);
-  assert.equal(env.doc.body.querySelectorAll('script[data-rtx-effect]').length, 2, 'in-flight 節點應保留');
-  // 完成第一個 in-flight：舊節點仍在 DOM（中間無 prune）
-  slowLoad();
-  await p1;
-  assert.equal(env.doc.body.querySelectorAll('script[data-rtx-effect]').length, 2);
-  // 下次注入：prune 移除兩已完成舊節點、計數回到 1
-  await ed.injectPlugin('fx-a', null);
-  assert.equal(env.doc.body.querySelectorAll('script[data-rtx-effect]').length, 1);
+  makeFakeEffects(env);
+  assert.equal(await ed.injectPlugin('fx-a', null), false, 'E2：404 → false');
+  assert.equal(ed.preview.loadedId, null);
+  assert.equal(bodyScripts(env).length, 0);
+  assert.equal(ed.codeCache['fx-a/viewer.js'], undefined, 'E2：失敗不寫 codeCache');
+  assert.equal(await ed.injectPlugin('fx-a', null), true);
+  assert.equal(ed.preview.loadedId, 'fx-a');
+  assert.equal(env.window.__fxPreviewRan, 1);
+  assert.equal(ed.codeCache['fx-a/viewer.js'].rev, 'b'.repeat(64));
+  // plugin 文字語法錯誤：new Function 拋錯 → false
+  ed.state.manifest.effects['fx-a'].viewerRev = 'y'.repeat(64);
+  assert.equal(await ed.injectPlugin('fx-a', null), false, 'E2：語法錯誤 → false');
+  assert.equal(ed.preview.loadedId, 'fx-a', 'loadedId 維持先前成功值');
 });
 
 // ===== 5n 格式檢查（輕量：語法＋註冊＋結構；單檔／3 檔＋匯入後自動檢查）=====

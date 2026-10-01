@@ -3065,9 +3065,28 @@
     }
     var spec = state.manifest && state.manifest.effects ? state.manifest.effects[id] : null;
     if (!spec) return false;
+    // E2：fetch 文字＋new Function（不注入 body <script data-rtx-effect>），rev-keyed codeCache 命中則免 request
+    var filename = effectViewerFile(spec);
     var effRev = spec.viewerRev || state.rev || '';
+    var ck = id + '/' + filename;
+    var text = null;
+    var cached = codeCache[ck];
+    if (cached && cached.rev === effRev) {
+      text = cached.content;
+    } else {
+      try {
+        var resp = await fetch('/effects/' + id + '/' + filename + '?v=' + encodeURIComponent(effRev));
+        if (!resp.ok) return false;
+        text = await resp.text();
+        codeCache[ck] = { content: text, rev: effRev };
+      } catch (e) {
+        return false;
+      }
+    }
+    previewDangerWarn(ck, text);
     try {
-      await loadScript('/effects/' + id + '/' + effectViewerFile(spec), id, effRev);
+      var fn = new Function('window', 'document', text);
+      fn(window, document);
     } catch (e) {
       return false;
     }

@@ -128,4 +128,5 @@
 - [x] 前端記憶體治理 Phase 3（console，S4 剩餘）：console 插件改以 per-effect `consoleRev` 做 cache-busting（`?v=consoleRev`、缺時 fallback manifest rev），未變插件 ETag 304 重驗證（2026-09-29）
 - [x] 前端記憶體治理 Phase 1（editor，S1）：preview/console 插件 script 節點以 `data-rtx-effect`／`data-rtx-rev` 標記、注入前移除已完成舊節點（container-scoped prune、in-flight 保留）、cache-busting 改 per-effect `viewerRev`／`consoleRev`（缺時 fallback manifest rev）（2026-09-30）
 - [x] 前端記憶體治理 Phase 2（editor，E5）：code 預覽 rev-keyed cache（`codeCache`：同 id＋同 rev 切回由 cache 顯示免重抓、rev 變化重抓、staged 優先於 cache、模板路徑亦入 cache）＋`previewViewerSource` `codeLoaded` guard（僅 `state.codeLoaded` 為本 id 之 viewer.js 時才信任 viewer tab textarea，否則回 null 落回磁碟路徑）（2026-09-30）
-- [ ] 前端記憶體治理後續（依 `docs/temp/frontend-memory/FRONTEND_MEMORY_PLAN.md`）：Phase 2 剩餘（E2＝S2 preview fetch 文字＋`new Function`、E3＝S3 registry 收斂）、Phase 3（S5 可觀測性）（2026-09-30）
+- [x] 前端記憶體治理 Phase 2（editor，E2）：preview 未-staged 路徑改「fetch 文字＋`new Function`」（`injectPlugin`：fetch `/effects/{id}/viewer.js?v=viewerRev`（fallback `state.rev`）文字→`new Function('window','document',text)` 執行、不注入 body `<script data-rtx-effect>`），與 E5 共用 rev-keyed `codeCache`（同 id＋同 rev 免 request、rev 變化重 fetch、404／語法錯誤→false 不寫 cache）（2026-09-30）
+- [ ] 前端記憶體治理後續（依 `docs/temp/frontend-memory/FRONTEND_MEMORY_PLAN.md`）：Phase 2 剩餘（E3＝S3 registry 收斂）、Phase 3（S5 可觀測性）（2026-09-30）
