@@ -225,7 +225,7 @@ console 特效按鈕以 `#rtx-fx-current`（主要）與 `#rtx-fx-alternate`（�
 - **即時預覽（右）**：canvas 以 `Effects.createEffect`／`stepEffect` 渲染；選定生成點以十字標記顯示（點 canvas 設定、預設 50/50、[重設 50/50] 還原）；簡化 console 面板（FAB 與面板 clamp 在 canvas 內、canvas 大小變化自動重 clamp、參數橫式布局對齊 console）；[開始預覽] 讀暫存/已存 console.js 渲染特效 icon＋參數（僅展示）、切換特效或 [重載] 清空；[開始預覽]／[清屏]（只清編輯器 canvas、不影響 viewer）／[測試特效]（以真實插件實際 smoke run）；preview 插件改以 fetch 文字＋`new Function` 執行（不注入 body `<script>` 節點、同 id＋同 rev 由 rev-keyed `codeCache` 提供免重抓）；插件碼於當前頁 realm 執行（非隔離沙箱），引用危險 API（`localStorage`／cookie／`fetch`／`eval` 等）者於預覽前顯示非阻斷「預覽預警」。
 - **儲存**：`PUT /api/editor/manifest`（`baseRev` 樂觀鎖、可 `deleteRemoved`）＋ `PUT /api/editor/effect/{id}/file`（插件檔）；修改前備份至 `effects/.backup/<timestamp>/`（保留 5 份）；舊 `baseRev` 回 `409`、限頻回 `429`、無效 manifest 回 `400` 並回滾。
 - **zip 匯入／匯出**：[匯出 effects.zip]（完整 manifest）／[匯出所選 effects.zip]（子集，zip 內 `effects.json` 只含所選 effects）；[匯入 effects.zip]（≤10 MB、staged、按 [保存至伺服器] 落盤，缺的插件檔自動補模板）。
-- **金鑰與自動更新**：讀取端點公開、寫入端點需 `X-Access-Key`（首次輸入存 `localStorage`）；經 SSE `/api/stream` 接收 `manifest` 事件提示重載，變更狀態以 `#ed-dirty` 指標顯示（已同步／未暫存變更／未保存變更／保存中）；頂列連線 badge 顯示「連線中…」／「已連線 · vN」／「斷線」；SSE 斷流不影響連線顯示（icon/badge 跟隨 manifest、非 SSE）。
+- **金鑰與自動更新**：讀取端點公開、寫入端點需 `X-Access-Key`（首次輸入存 `localStorage`）；經 SSE `/api/stream` 接收 `manifest` 事件提示重載，變更狀態以 `#ed-dirty` 指標顯示（已同步／未暫存變更／未保存變更／保存中）；頂列連線 badge 顯示「連線中…」／「已連線 · vN」／「斷線」；SSE 斷流不影響連線顯示（icon/badge 跟隨 manifest、非 SSE）；manifest 載入／重載／SSE 更新後收斂雙 registry（`window.Effects.registry`／`window.RTX_EFFECT_CONSOLE.registry` 移除已不在 manifest 的 id、保留 id 不受影響，執行中 preview 實體不受影響）。
 
 ## 示範頁（examples，opt-in）
 
@@ -330,9 +330,9 @@ npx playwright test
 npm run test
 ```
 
-目前測試數量：pytest 161 項（`test_api` 63、`test_server_logging` 13、`test_editor_api` 85）、node 248 項（`test_console` 74、`test_effect_examples` 16、`test_effects` 19、`test_effect_catalog` 2、`test_editor` 137）、Playwright E2E 88 項（`tests/e2e/editor.spec.js` 60 項）。
+目前測試數量：pytest 161 項（`test_api` 63、`test_server_logging` 13、`test_editor_api` 85）、node 250 項（`test_console` 74、`test_effect_examples` 16、`test_effects` 19、`test_effect_catalog` 2、`test_editor` 139）、Playwright E2E 89 項（`tests/e2e/editor.spec.js` 61 項）。
 
-Playwright E2E 會自動啟動 server（port `8123`）；webServer 先經 `tests/e2e/pre-server-copy.mjs` 把 `tests/fixtures/` 的 4 特效複製到隔離的 `tmp/e2e-effects/`，並以 `RTX_EFFECTS_DIR` 指向該目錄（`tests/e2e/global-teardown.js` 測試後清理，E2E 全程不碰正式 `effects/`）；uvicorn stdout/stderr 重定向至 gitignored `e2e-server.log`。`tests/e2e/editor.spec.js`（60 項）驗證 `/editor` 全功能：manifest 載入／重載／SSE、meta/params 編輯保存與 409、批次操作、新增特效（effect_id 欄位）、zip 匯入匯出、代碼編輯、即時預覽與 timeline、[測試特效]、簡化 console 面板、格式檢查與狀態指標、S1 preview E2（body `script[data-rtx-effect]` 不累積＋同 rev 免重複 request）、console head `script[data-rtx-effect]` 不累積。其餘 spec 各管一題：`fx-layout`（console 雙區拖曳／FLIP 動畫／localStorage）、`fx-drag-trigger-distance`（8 方向拖曳觸發距離）、`fx-button-counts`（console 按鈕數）、`reload-manifest`（viewer 自動更新／console 手動重載）、`multi-console-reload`（多 console 獨立重載）、`effect-params`（參數輸入送 POST body）、`console-viewer-flow`（console→viewer 流程）、`examples-smoke`／`examples-theme-toggle`（examples 頁 smoke 與主題切換）。
+Playwright E2E 會自動啟動 server（port `8123`）；webServer 先經 `tests/e2e/pre-server-copy.mjs` 把 `tests/fixtures/` 的 4 特效複製到隔離的 `tmp/e2e-effects/`，並以 `RTX_EFFECTS_DIR` 指向該目錄（`tests/e2e/global-teardown.js` 測試後清理，E2E 全程不碰正式 `effects/`）；uvicorn stdout/stderr 重定向至 gitignored `e2e-server.log`。`tests/e2e/editor.spec.js`（61 項）驗證 `/editor` 全功能：manifest 載入／重載／SSE、meta/params 編輯保存與 409、批次操作、新增特效（effect_id 欄位）、zip 匯入匯出、代碼編輯、即時預覽與 timeline、[測試特效]、簡化 console 面板、格式檢查與狀態指標、S1 preview E2（body `script[data-rtx-effect]` 不累積＋同 rev 免重複 request）、console head `script[data-rtx-effect]` 不累積、S3 雙 registry 收斂（新增→預覽→移除→保存後兩 registry 無殘留 id、保留 id 不受影響）。其餘 spec 各管一題：`fx-layout`（console 雙區拖曳／FLIP 動畫／localStorage）、`fx-drag-trigger-distance`（8 方向拖曳觸發距離）、`fx-button-counts`（console 按鈕數）、`reload-manifest`（viewer 自動更新／console 手動重載）、`multi-console-reload`（多 console 獨立重載）、`effect-params`（參數輸入送 POST body）、`console-viewer-flow`（console→viewer 流程）、`examples-smoke`／`examples-theme-toggle`（examples 頁 smoke 與主題切換）。
 
 ## 文件
 

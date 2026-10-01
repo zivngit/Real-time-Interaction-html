@@ -279,6 +279,21 @@
     if (els.badge) els.badge.textContent = '斷線';
   }
 
+  // E3/S3：manifest 刷新後雙 registry 收斂到新一版——移除已不在 effects 的 id 條目
+  // （執行中 preview 實體持有自己的 closure，不受 registry 移除影響；再預覽時 injectPlugin 會重新註冊）
+  function pruneEffectRegistries() {
+    var effects = state.manifest && state.manifest.effects;
+    if (!effects) return;
+    if (window.Effects && window.Effects.registry) {
+      Object.keys(window.Effects.registry).forEach(function (key) {
+        if (!effects[key]) delete window.Effects.registry[key];
+      });
+    }
+    Object.keys(consoleRegistry.registry).forEach(function (key) {
+      if (!effects[key]) delete consoleRegistry.registry[key];
+    });
+  }
+
   async function loadManifest() {
     // U9：載入／重載過渡態——badge 顯示「連線中…」，成功→已連線·vN（renderChips）、失敗→斷線（onConnFail）
     if (els.badge) els.badge.textContent = '連線中…';
@@ -306,6 +321,7 @@
     state.rev = data.rev;
     state.baseRev = data.rev;
     state.manifest = data.manifest;
+    pruneEffectRegistries();
     state.batch = state.batch.filter(function (id) {
       return state.manifest && state.manifest.effects && state.manifest.effects[id];
     });

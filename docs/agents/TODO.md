@@ -12,7 +12,7 @@
 
 - SSE 斷線期間特效遺失（規格：不重播）
 - 限頻為全域滑動視窗（未區分客戶端）
-- 前端（console/viewer/editor）已有 Playwright 瀏覽器 E2E（`tests/e2e/`，88 項，含 `editor.spec.js` 60 項；webServer stdout/stderr 重定向 gitignored `e2e-server.log`、測試輸出不混 server log；webServer 以 `RTX_EFFECTS_DIR` 指向 `pre-server-copy.mjs` 複製的隔離 `tmp/e2e-effects/`（僅 fixture 4 特效）、`globalTeardown` 清理，E2E 不碰正式 `effects/`）；console 另有 node vm 冒煙測試（`tests/test_console.mjs`，74 項），viewer 另有 node vm 冒煙測試（`tests/test_effects.mjs`，19 項），特效編輯器另有 node vm 測試（`tests/test_editor.mjs`，137 項）與 pytest API 測試（`tests/test_editor_api.py`，85 項），特效範例另有 node vm 冒煙測試（`tests/test_effect_examples.mjs`，16 項），正式 catalog 另有 node vm 驗證測試（`tests/test_effect_catalog.mjs`，2 項）
+- 前端（console/viewer/editor）已有 Playwright 瀏覽器 E2E（`tests/e2e/`，89 項，含 `editor.spec.js` 61 項；webServer stdout/stderr 重定向 gitignored `e2e-server.log`、測試輸出不混 server log；webServer 以 `RTX_EFFECTS_DIR` 指向 `pre-server-copy.mjs` 複製的隔離 `tmp/e2e-effects/`（僅 fixture 4 特效）、`globalTeardown` 清理，E2E 不碰正式 `effects/`）；console 另有 node vm 冒煙測試（`tests/test_console.mjs`，74 項），viewer 另有 node vm 冒煙測試（`tests/test_effects.mjs`，19 項），特效編輯器另有 node vm 測試（`tests/test_editor.mjs`，139 項）與 pytest API 測試（`tests/test_editor_api.py`，85 項），特效範例另有 node vm 冒煙測試（`tests/test_effect_examples.mjs`，16 項），正式 catalog 另有 node vm 驗證測試（`tests/test_effect_catalog.mjs`，2 項）
 
 ## 第一階段：建立可維護的執行基礎
 
@@ -129,4 +129,5 @@
 - [x] 前端記憶體治理 Phase 1（editor，S1）：preview/console 插件 script 節點以 `data-rtx-effect`／`data-rtx-rev` 標記、注入前移除已完成舊節點（container-scoped prune、in-flight 保留）、cache-busting 改 per-effect `viewerRev`／`consoleRev`（缺時 fallback manifest rev）（2026-09-30）
 - [x] 前端記憶體治理 Phase 2（editor，E5）：code 預覽 rev-keyed cache（`codeCache`：同 id＋同 rev 切回由 cache 顯示免重抓、rev 變化重抓、staged 優先於 cache、模板路徑亦入 cache）＋`previewViewerSource` `codeLoaded` guard（僅 `state.codeLoaded` 為本 id 之 viewer.js 時才信任 viewer tab textarea，否則回 null 落回磁碟路徑）（2026-09-30）
 - [x] 前端記憶體治理 Phase 2（editor，E2）：preview 未-staged 路徑改「fetch 文字＋`new Function`」（`injectPlugin`：fetch `/effects/{id}/viewer.js?v=viewerRev`（fallback `state.rev`）文字→`new Function('window','document',text)` 執行、不注入 body `<script data-rtx-effect>`），與 E5 共用 rev-keyed `codeCache`（同 id＋同 rev 免 request、rev 變化重 fetch、404／語法錯誤→false 不寫 cache）（2026-09-30）
-- [ ] 前端記憶體治理後續（依 `docs/temp/frontend-memory/FRONTEND_MEMORY_PLAN.md`）：Phase 2 剩餘（E3＝S3 registry 收斂）、Phase 3（S5 可觀測性）（2026-09-30）
+- [x] 前端記憶體治理 Phase 2（editor，E3）：manifest 載入／重載／SSE 更新後收斂雙 registry（`pruneEffectRegistries`：`state.manifest.effects` 不具的 id 自 `window.Effects.registry` 與 `window.RTX_EFFECT_CONSOLE.registry` 移除、保留 id 不受影響），消「曾預覽/測試的 id 永久殘留」M3（2026-09-30）
+- [ ] 前端記憶體治理後續（依 `docs/temp/frontend-memory/FRONTEND_MEMORY_PLAN.md`）：Phase 3（S5 可觀測性）（2026-09-30）

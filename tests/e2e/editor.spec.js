@@ -1924,6 +1924,103 @@ test.describe('S1 插件 script 節點計數穩定（memory governance）', () =
   });
 });
 
+test.describe('S3 雙 registry 收斂（memory governance E3）', () => {
+  let fixtureBytes = null;
+
+  test.beforeAll(async () => {
+    fixtureBytes = snapshotFixture();
+  });
+
+  test.afterEach(async ({ page }) => {
+    restoreFixture(fixtureBytes);
+    await waitRateLimit();
+    await page.request.post('/api/effects/reload');
+  });
+
+  test('新增→預覽→移除→保存：兩 registry 無殘留 id（保留 id 不受影響）', async ({ page }) => {
+    const errs = trackPageErrors(page);
+    await waitRateLimit();
+    writeFixture(v2Fixture(readFixture()));
+    await page.request.post('/api/effects/reload');
+    await openEditorPage(page);
+    page.on('dialog', (d) => d.accept()); // 7d：[保存至伺服器] confirm 自動接受
+
+    // 預設選定 particle：預覽→兩 registry 均註冊 particle
+    await page.locator('#ed-preview-start').click();
+    await expect
+      .poll(async () => page.evaluate(() => typeof window.Effects?.registry?.particle))
+      .toBe('function');
+    await expect
+      .poll(async () => page.evaluate(() => !!window.RTX_EFFECT_CONSOLE.registry.particle))
+      .toBe(true);
+    await page.locator('#ed-preview-clear').click();
+    await expect(await page.evaluate(() => window.__rtxEditor.preview.running)).toBe(false);
+
+    // 新增特效（staged）→ re-key zz-test→stage console.js（[存檔]即執行 register）→viewer tab 模板→預覽→兩 registry 均註冊 zz-test
+    await page.locator('#ed-add-btn').click();
+    await page.locator('#ed-add-new').click();
+    await page.waitForTimeout(300);
+    await page.locator('#ed-meta-id').fill('zz-test');
+    await page.locator('#ed-save-file').click();
+    await page.waitForTimeout(300);
+    await page.locator('#ed-tabs .tab[data-tab="console"]').click();
+    await page.waitForTimeout(300);
+    await page.locator('#ed-code').fill(
+      "window.RTX_EFFECT_CONSOLE.register('zz-test', { iconID: 'generic', render: function () {} });"
+    );
+    await page.locator('#ed-save-file').click();
+    await page.waitForTimeout(300);
+    // viewer tab：無盤上檔→server 模板→[存檔] staged（in-editor source 供 previewViewerSource）
+    await page.locator('#ed-tabs .tab[data-tab="viewer"]').click();
+    await page.waitForTimeout(300);
+    await page.locator('#ed-save-file').click();
+    await page.waitForTimeout(300);
+    await page.locator('#ed-preview-start').click();
+    await expect
+      .poll(async () => page.evaluate(() => typeof window.Effects?.registry?.['zz-test']))
+      .toBe('function');
+    await expect
+      .poll(async () => page.evaluate(() => !!window.RTX_EFFECT_CONSOLE.registry['zz-test']))
+      .toBe(true);
+    await page.locator('#ed-preview-clear').click();
+
+    // [保存] #1：server 建 zz-test→loadManifest 收斂後 zz-test 仍在 manifest（registry 維持）
+    await waitRateLimit();
+    const put1 = page.waitForResponse(
+      (r) => r.url().includes('/api/editor/manifest') && r.request().method() === 'PUT' && r.ok()
+    );
+    await page.locator('#ed-save-btn').click();
+    const r1 = await put1;
+    expect(r1.status()).toBe(200);
+    await expect(page.locator('#ed-dirty')).toHaveText('已同步');
+    expect(await page.evaluate(() => typeof window.Effects.registry['zz-test'])).toBe('function');
+    expect(await page.evaluate(() => !!window.RTX_EFFECT_CONSOLE.registry['zz-test'])).toBe(true);
+
+    // [✕ 移除] zz-test→[保存] #2：deleteRemoved→loadManifest 收斂兩 registry
+    await page.locator('#ed-zone-cur .fx-item[data-fx="zz-test"] .rm').click();
+    await page.waitForTimeout(300);
+    await waitRateLimit();
+    const put2 = page.waitForResponse(
+      (r) => r.url().includes('/api/editor/manifest') && r.request().method() === 'PUT' && r.ok()
+    );
+    await page.locator('#ed-save-btn').click();
+    const r2 = await put2;
+    expect(r2.status()).toBe(200);
+    await expect(page.locator('#ed-dirty')).toHaveText('已同步');
+    // zz-test 已不在 manifest→兩 registry 不應殘留該 id
+    await expect
+      .poll(async () => page.evaluate(() => window.Effects?.registry?.['zz-test']))
+      .toBe(undefined);
+    await expect
+      .poll(async () => page.evaluate(() => window.RTX_EFFECT_CONSOLE.registry['zz-test']))
+      .toBe(undefined);
+    // particle 保留於 manifest→registry 條目不受影響
+    expect(await page.evaluate(() => typeof window.Effects.registry.particle)).toBe('function');
+    expect(await page.evaluate(() => !!window.RTX_EFFECT_CONSOLE.registry.particle)).toBe(true);
+    expect(errs, errs).toEqual([]);
+  });
+});
+
 test.describe('5r 測試特效（單個特效測試）', () => {
   test('v1：[測試特效] → 真實插件實際運行、結果顯示於預覽面板結果區', async ({ page }) => {
     const errs = trackPageErrors(page);

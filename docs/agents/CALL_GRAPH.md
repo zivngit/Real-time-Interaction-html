@@ -1,6 +1,6 @@
 # Real-time Interaction html 函式呼叫關係圖
 
-> 最後更新：2026-09-29
+> 最後更新：2026-09-30
 
 ## 1. 整體架構
 
@@ -367,7 +367,7 @@ classDiagram
 +prunePreviewScripts() / pruneConsolePlugins()
   +codeCache{id+'/'+filename → {content, rev}}（E5＋E2 共用 rev-keyed cache：同 id＋同 rev 免重抓／免 request、staged 優先）
         +miniPos{miniOpen, miniDrag}
-        +loadManifest() / renderChips() / zones() / buildItem() / iconFor(id, spec) / resolvedPluginIcon(type) / loadConsolePlugin(id, spec, rev) / applyStagedConsole(id, content)
+        +loadManifest() / pruneEffectRegistries() / renderChips() / zones() / buildItem() / iconFor(id, spec) / resolvedPluginIcon(type) / loadConsolePlugin(id, spec, rev) / applyStagedConsole(id, content)
         +renderList() / selectItem(id) / initListDrag()
         +setDirty(v) / setDirtyUI() / hasUnstagedCode() / setEditable(v) / syncCodeEditable() / syncMetaIdEditable()
         +postJson(path, body) / putJson(path, body) / save() / reloadManifest() / openStream() / injectIcons()
@@ -385,7 +385,7 @@ classDiagram
         +checkEffectsEntry(id, entry, errors, warnings) / checkViewerSource(id, source, entry, errors, warnings) / checkConsoleSource(id, source, entry, errors, warnings)
     }
     Viewer ..> Effects : toPixels / createEffect / stepEffect
-    EditorPage ..> Effects : ensureEffectsCore 載入 /viewer/effects.js（core、未標記）、injectPlugin（E2：fetch 文字經 new Function 執行、註冊 effect type）→ createEffect / stepEffect；previewViewerSource 僅 codeLoaded 為本 id viewer.js 時回 textarea、否則 null 落回 injectPlugin 磁碟路徑
+    EditorPage ..> Effects : ensureEffectsCore 載入 /viewer/effects.js（core、未標記）、injectPlugin（E2：fetch 文字經 new Function 執行、註冊 effect type）→ createEffect / stepEffect；previewViewerSource 僅 codeLoaded 為本 id viewer.js 時回 textarea、否則 null 落回 injectPlugin 磁碟路徑；E3：loadManifest 成功後 pruneEffectRegistries 收斂（manifest 不具的 id 移除 Effects.registry／consoleRegistry、保留 id 不受影響、執行中 preview 實體不受影響）
     EditorPage ..> Server : GET /api/editor/manifest / PUT /api/editor/manifest / GET-PUT /api/editor/effect/{id}/viewer.js|console.js（code 預覽 GET 經 E5 codeCache：同 id＋同 rev 由 cache 顯示、staged 優先、模板路徑亦入 cache）/ DELETE /api/editor/effect/{id} / POST /api/editor/export / POST /api/editor/import / POST /api/effects/reload / POST /api/effect / POST /api/clear / GET /api/stream（SSE manifest 事件）/ GET /effects/{id}/viewer.js（E2 preview fetch 文字→new Function 執行、per-effect ?v=viewerRev（fallback state.rev）、與 E5 共用 codeCache：同 id＋同 rev 免 request、rev 變化重 fetch）/ GET /effects/{id}/console.js（簡化 console 按需載入 icon＋參數 render、per-effect ?v=consoleRev（fallback rev）、節點帶 data-rtx-effect/data-rtx-rev、注入前 pruneConsolePlugins）
     EditorPage ..> EditorApi : manifest 讀取（editor router）
     EffectPlugin ..> Effects : register(type, factory)
@@ -428,8 +428,8 @@ flowchart LR
     TX["tests/test_effect_examples.mjs<br/>node --test＋vm fake sandbox（16）"] --> X["examples/effects/*/effects.json ＋ viewer.js ＋ console.js"]
     TG["tests/test_effect_catalog.mjs<br/>node --test＋vm（2）<br/>正式 effects/effects.json、effects/*/viewer.js、選用 console.js"] --> S_REAL["正式 effects/（effects.json＋*/viewer.js＋選用 console.js）"]
     TG --> K
-    TEX["tests/test_editor.mjs<br/>node --test＋vm fake DOM（137）<br/>manifest 載入/chips/連線（badge 過渡態＋SSE 斷流不轉紅/streamOk 獨立）、v1/v2/disabled 分區、srvKey＋X-Access-Key、dirty＋beforeunload、重載（429 重試）、meta/params 編輯保存（409/429）、批次/拖曳/新增/移除 staged、列表就地協調、待刪除/已刪除專屬區、code 區 staged/匯入匯出/格式檢查/語法高亮（6v）、結果區合併（#ed-ops-result，6w）、復原待刪衝突（6x）、預覽前危險 API 預警（6y）、scroll 同步 transform（6z）、批次列常顯示＋結果訊息中文化（7b）、拖曳把柄限 grip（7c）、#ed-dirty 四態＋[保存至伺服器] confirm（7d）、preview timeline（7e）＋timeline UX（7f）＋播放期間不顯示 marker（7g）＋transport 圖示（7h）＋[清屏] >| 圖示（7i）、color 參數顏色選取器（7j）、array 參數子項列（7k）、S1 preview E2 fetch 文字＋new Function（不注入 body `<script data-rtx-effect>`、?v=viewerRev（fallback state.rev）、同 id＋同 rev 免 request、rev 變化重 fetch、404／語法錯誤→false 不寫 cache）＋console 插件 per-effect ?v=consoleRev（head 節點標記＋prune）、E5 code 預覽 rev-keyed cache（與 E2 共用：同 id＋同 rev 切回免重抓、rev 變化重抓、staged 優先於 cache 且不覆蓋 cache）＋previewViewerSource codeLoaded guard（stale／manifest tab／空內容皆 null、staged 優先）"]
-    TP["tests/e2e/*.spec.js<br/>Playwright E2E（88）<br/>預設 webServer port 8123（stdout/stderr→e2e-server.log、RTX_EFFECTS_DIR→tmp/e2e-effects（pre-server-copy.mjs 自 tests/fixtures/ 複製 4 特效、不碰正式 effects/、globalTeardown 清理））<br/>editor.spec.js（60）：/editor 全功能（manifest 載入/重載/SSE、meta/params 編輯保存與 409、批次、新增特效（effect_id 欄位）、zip 匯入匯出、代碼編輯＋語法高亮、即時預覽＋timeline、[測試特效]、簡化 console 面板、格式檢查、狀態指標、待刪除/已刪除專屬區、S1 preview E2 不累積 body script＋同 rev 免重複 request）<br/>fx-layout.spec.js（13）：console 雙區拖曳/FLIP 動畫/localStorage<br/>fx-drag-trigger-distance.spec.js（1）：8 方向 pointer 拖曳觸發距離<br/>fx-button-counts.spec.js（1）：console 按鈕數<br/>reload-manifest.spec.js（1）：viewer 自動更新＋console 手動重載（ETag 條件請求：未變資產 304、內容變更 200＋新 rev；console 插件 per-effect consoleRev＝console.js SHA-256）<br/>multi-console-reload.spec.js（1）：多 console 獨立重載＋selected fallback<br/>effect-params.spec.js（4）：參數輸入送 POST body、editable:false 不渲染<br/>console-viewer-flow.spec.js（1）：console 點擊送 viewer＋clear 重置<br/>examples-smoke.spec.js（5）：examples 頁 smoke test<br/>examples-theme-toggle.spec.js（1）：light/dark 主題切換＋persistence"]
+    TEX["tests/test_editor.mjs<br/>node --test＋vm fake DOM（139）<br/>manifest 載入/chips/連線（badge 過渡態＋SSE 斷流不轉紅/streamOk 獨立）、v1/v2/disabled 分區、srvKey＋X-Access-Key、dirty＋beforeunload、重載（429 重試）、meta/params 編輯保存（409/429）、批次/拖曳/新增/移除 staged、列表就地協調、待刪除/已刪除專屬區、code 區 staged/匯入匯出/格式檢查/語法高亮（6v）、結果區合併（#ed-ops-result，6w）、復原待刪衝突（6x）、預覽前危險 API 預警（6y）、scroll 同步 transform（6z）、批次列常顯示＋結果訊息中文化（7b）、拖曳把柄限 grip（7c）、#ed-dirty 四態＋[保存至伺服器] confirm（7d）、preview timeline（7e）＋timeline UX（7f）＋播放期間不顯示 marker（7g）＋transport 圖示（7h）＋[清屏] >| 圖示（7i）、color 參數顏色選取器（7j）、array 參數子項列（7k）、S1 preview E2 fetch 文字＋new Function（不注入 body `<script data-rtx-effect>`、?v=viewerRev（fallback state.rev）、同 id＋同 rev 免 request、rev 變化重 fetch、404／語法錯誤→false 不寫 cache）＋console 插件 per-effect ?v=consoleRev（head 節點標記＋prune）、E5 code 預覽 rev-keyed cache（與 E2 共用：同 id＋同 rev 切回免重抓、rev 變化重抓、staged 優先於 cache 且不覆蓋 cache）＋previewViewerSource codeLoaded guard（stale／manifest tab／空內容皆 null、staged 優先）、S3 雙 registry 收斂（loadManifest 收斂：manifest 不具之 id 自 Effects.registry／consoleRegistry 清除、保留 id 不受影響）"]
+    TP["tests/e2e/*.spec.js<br/>Playwright E2E（89）<br/>預設 webServer port 8123（stdout/stderr→e2e-server.log、RTX_EFFECTS_DIR→tmp/e2e-effects（pre-server-copy.mjs 自 tests/fixtures/ 複製 4 特效、不碰正式 effects/、globalTeardown 清理））<br/>editor.spec.js（61）：/editor 全功能（manifest 載入/重載/SSE、meta/params 編輯保存與 409、批次、新增特效（effect_id 欄位）、zip 匯入匯出、代碼編輯＋語法高亮、即時預覽＋timeline、[測試特效]、簡化 console 面板、格式檢查、狀態指標、待刪除/已刪除專屬區、S1 preview E2 不累積 body script＋同 rev 免重複 request、S3 雙 registry 收斂（新增→預覽→移除→保存後兩 registry 無殘留 id、保留 id 不受影響））<br/>fx-layout.spec.js（13）：console 雙區拖曳/FLIP 動畫/localStorage<br/>fx-drag-trigger-distance.spec.js（1）：8 方向 pointer 拖曳觸發距離<br/>fx-button-counts.spec.js（1）：console 按鈕數<br/>reload-manifest.spec.js（1）：viewer 自動更新＋console 手動重載（ETag 條件請求：未變資產 304、內容變更 200＋新 rev；console 插件 per-effect consoleRev＝console.js SHA-256）<br/>multi-console-reload.spec.js（1）：多 console 獨立重載＋selected fallback<br/>effect-params.spec.js（4）：參數輸入送 POST body、editable:false 不渲染<br/>console-viewer-flow.spec.js（1）：console 點擊送 viewer＋clear 重置<br/>examples-smoke.spec.js（5）：examples 頁 smoke test<br/>examples-theme-toggle.spec.js（1）：light/dark 主題切換＋persistence"]
     TP --> K
     TP --> S
     TP --> TF

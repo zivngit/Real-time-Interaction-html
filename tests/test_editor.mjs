@@ -1055,6 +1055,46 @@ test('SSE manifest 事件：rev 不同才重抓 manifest（baseRev 同步）', a
   assert.equal(env.fetchCalls.length, before2);
 });
 
+test('E3：SSE manifest rev 變化→loadManifest 收斂雙 registry（移除 id 清除、保留 id 不受影響）', async () => {
+  const env = await loadEnv({});
+  const ed = env.window.__rtxEditor;
+  // 模擬先前已註冊：particle（仍在新 manifest）＋ ghost（已移除）
+  env.window.Effects = { registry: { particle: function () {}, ghost: function () {} } };
+  env.window.RTX_EFFECT_CONSOLE.registry.particle = { render: function () {} };
+  env.window.RTX_EFFECT_CONSOLE.registry.ghost = { render: function () {} };
+  const newRev = 'c'.repeat(64);
+  const p2 = JSON.parse(JSON.stringify(DEFAULT_MANIFEST));
+  p2.rev = newRev;
+  env.manifest.payload = p2;
+  FakeEventSource.instances[0]._emit('manifest', JSON.stringify({ rev: newRev }));
+  await settle();
+  assert.equal(ed.state.rev, newRev);
+  assert.equal(typeof env.window.Effects.registry.particle, 'function', '保留 id 應維持於 Effects.registry');
+  assert.equal(env.window.Effects.registry.ghost, undefined, '移除 id 應自 Effects.registry 清除');
+  assert.ok(env.window.RTX_EFFECT_CONSOLE.registry.particle, '保留 id 應維持於 console registry');
+  assert.equal(env.window.RTX_EFFECT_CONSOLE.registry.ghost, undefined, '移除 id 應自 console registry 清除');
+});
+
+test('E3：[重載] 重抓 manifest 後收斂雙 registry（firework 移除、其餘維持）', async () => {
+  const env = await loadEnv({});
+  const els = env.els;
+  env.window.Effects = { registry: { firework: function () {}, ripple: function () {} } };
+  env.window.RTX_EFFECT_CONSOLE.registry.firework = { render: function () {} };
+  env.window.RTX_EFFECT_CONSOLE.registry.ripple = { render: function () {} };
+  const newRev = 'f'.repeat(64);
+  const p2 = JSON.parse(JSON.stringify(DEFAULT_MANIFEST));
+  delete p2.manifest.effects.firework;
+  p2.rev = newRev;
+  env.manifest.payload = p2;
+  els.reloadBtn._fire('click', {});
+  await settle();
+  assert.equal(env.window.__rtxEditor.state.rev, newRev);
+  assert.equal(env.window.Effects.registry.firework, undefined, '移除 id 應自 Effects.registry 清除');
+  assert.equal(env.window.RTX_EFFECT_CONSOLE.registry.firework, undefined, '移除 id 應自 console registry 清除');
+  assert.equal(typeof env.window.Effects.registry.ripple, 'function', '保留 id 應維持於 Effects.registry');
+  assert.ok(env.window.RTX_EFFECT_CONSOLE.registry.ripple, '保留 id 應維持於 console registry');
+});
+
 test('manifest 載入失敗：連線狀態 err、badge 斷線、列表空、不開 SSE', async () => {
   const env = await loadEnv({ manifestFail: true });
   const els = env.els;
