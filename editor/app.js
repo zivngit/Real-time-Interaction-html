@@ -2128,6 +2128,9 @@
     return '有未暫存的' + what + '，' + action + '將捨棄。確定繼續？';
   }
 
+  // E5：code preview rev-keyed cache（id/filename → {content,rev}）——同 rev（檔案內容未變）免重複 GET
+  var codeCache = {};
+
   function codeFilePath() {
     var name = activeTab();
     if (name !== 'viewer' && name !== 'console') return null;
@@ -2150,6 +2153,14 @@
     if (staged && typeof staged.content === 'string') {
       showCode(staged.content);
       setWarnings('（' + id + ' 顯示 [暫存] 的 staged 內容，按 [保存至伺服器] 寫入伺服器）');
+      return;
+    }
+    // E5：rev-keyed cache——同 id 同 rev（檔案內容未變）→ 由 cache 顯示，免重複 GET
+    var spec = state.manifest.effects[id];
+    var crev = (spec && (filename === 'viewer.js' ? spec.viewerRev : spec.consoleRev)) || state.rev || '';
+    var cached = codeCache[id + '/' + filename];
+    if (cached && cached.rev === crev) {
+      showCode(cached.content);
       return;
     }
     var r;
@@ -2183,7 +2194,9 @@
           setWarnings('載入失敗 ' + tr.status + (td ? '：' + td : ''), 'err');
           return;
         }
-        showCode(await tr.text());
+        var ttext = await tr.text();
+        codeCache[id + '/' + filename] = { content: ttext, rev: crev };
+        showCode(ttext);
         setWarnings('（' + id + ' 套用 ' + filename + ' 模板，[暫存]／[保存至伺服器]後寫入伺服器）');
         return;
       }
@@ -2198,7 +2211,9 @@
       setWarnings('載入失敗 ' + r.status + (detail ? '：' + detail : ''), 'err');
       return;
     }
-    showCode(await r.text());
+    var ftext = await r.text();
+    codeCache[id + '/' + filename] = { content: ftext, rev: crev };
+    showCode(ftext);
   }
 
   async function saveFile() {
@@ -3028,7 +3043,11 @@
     if (pc[id + '/viewer.js'] && typeof pc[id + '/viewer.js'].content === 'string') {
       return pc[id + '/viewer.js'].content;
     }
-    if (activeTab() === 'viewer' && els.code && els.code.value) return els.code.value;
+    // E5：僅當 codeLoaded 即此 id 的 viewer.js 時才信任 textarea（避免切換特效 fetch 未完成時把舊內容當本特效 source）
+    if (activeTab() === 'viewer' && els.code && els.code.value) {
+      var b = state.codeLoaded;
+      if (b && b.id === id && b.filename === 'viewer.js') return els.code.value;
+    }
     return null;
   }
 
@@ -3931,8 +3950,10 @@
     loadConsolePlugin: loadConsolePlugin,
     applyStagedConsole: applyStagedConsole,
     injectPlugin: injectPlugin,
+    previewViewerSource: previewViewerSource,
     previewDangerScan: previewDangerScan,
     pluginCache: pluginCache,
+    codeCache: codeCache,
     prepareMiniConsole: prepareMiniConsole,
     renderMiniConsole: renderMiniConsole,
     clearMiniConsole: clearMiniConsole,

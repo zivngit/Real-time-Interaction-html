@@ -4231,3 +4231,148 @@ test('7n：程式碼＋manifest 欄位皆未暫存→確認訊息提及兩者（
   assert.ok(confirms[0].includes('程式碼和 manifest 欄位變更'), '訊息應同時提及程式碼和 manifest 欄位');
   assert.equal(ed.state.selected, 'fx-a', '取消→未切換');
 });
+
+test('E5 rev-keyed cache：同 id 同 rev 切回不重複 GET（A→B→A 只 1 次 fx-a GET）', async () => {
+  const env = await loadEnv({
+    manifest: M2,
+    fileGetSeq: [
+      { status: 200, payload: 'A-v1' }, // fx-a viewer（切 tab 時載入）
+      { status: 200, payload: 'B-v1' } // fx-b viewer（切到 fx-b）
+    ]
+  });
+  const ed = env.window.__rtxEditor;
+  const els = env.els;
+  els.tabs.querySelectorAll('.tab').find((t) => t.getAttribute('data-tab') === 'viewer')._fire('click', {});
+  await settle(4);
+  assert.equal(els.code.value, 'A-v1');
+  assert.equal(ed.codeCache['fx-a/viewer.js'].content, 'A-v1');
+  assert.equal(ed.codeCache['fx-a/viewer.js'].rev, M2.rev);
+  ed.selectItem('fx-b');
+  await settle(4);
+  assert.equal(els.code.value, 'B-v1');
+  ed.selectItem('fx-a');
+  await settle(4);
+  assert.equal(els.code.value, 'A-v1', '同 rev→cache hit 顯示');
+  const fxAGets = env.fetchCalls.filter((c) => c.url === '/api/editor/effect/fx-a/viewer.js');
+  assert.equal(fxAGets.length, 1, '切回 fx-a 不應再 GET');
+});
+
+test('E5 rev 變化（viewerRev／state.rev）→ 重抓檔案', async () => {
+  const manifest = {
+    rev: 'a1'.repeat(32),
+    manifest: {
+      version: 2,
+      effects: {
+        'fx-a': { label: 'Alpha', enabled: true, params: {}, viewerRev: 'v1'.repeat(32) },
+        'fx-b': { label: 'Beta', enabled: true, params: {} }
+      },
+      currentEffects: ['fx-a', 'fx-b']
+    }
+  };
+  const env = await loadEnv({
+    manifest,
+    fileGetSeq: [
+      { status: 200, payload: 'A-v1' }, // fx-a 首次（viewerRev v1）
+      { status: 200, payload: 'A-v2' }, // fx-a viewerRev 變 v2 後重抓
+      { status: 200, payload: 'B-v1' }, // fx-b 首次（state.rev）
+      { status: 200, payload: 'B-v2' } // fx-b state.rev 變化後重抓
+    ]
+  });
+  const ed = env.window.__rtxEditor;
+  const els = env.els;
+  els.tabs.querySelectorAll('.tab').find((t) => t.getAttribute('data-tab') === 'viewer')._fire('click', {});
+  await settle(4);
+  assert.equal(els.code.value, 'A-v1');
+  assert.equal(ed.codeCache['fx-a/viewer.js'].rev, 'v1'.repeat(32), 'cache key 用 viewerRev');
+  // viewerRev 更新（模擬 server manifest 更新）→ 重抓
+  ed.state.manifest.effects['fx-a'].viewerRev = 'v2'.repeat(32);
+  await ed.loadCodeFile();
+  await settle(2);
+  assert.equal(els.code.value, 'A-v2', 'viewerRev 變化→重抓');
+  assert.equal(ed.codeCache['fx-a/viewer.js'].rev, 'v2'.repeat(32));
+  // fx-b 無 viewerRev→fallback state.rev；state.rev 變化→重抓
+  ed.selectItem('fx-b');
+  await settle(4);
+  assert.equal(els.code.value, 'B-v1');
+  assert.equal(ed.codeCache['fx-b/viewer.js'].rev, manifest.rev, '無 viewerRev→state.rev');
+  ed.state.rev = 'z1'.repeat(32);
+  await ed.loadCodeFile();
+  await settle(2);
+  assert.equal(els.code.value, 'B-v2', 'state.rev 變化→重抓');
+  const fxAGets = env.fetchCalls.filter((c) => c.url === '/api/editor/effect/fx-a/viewer.js');
+  assert.equal(fxAGets.length, 2);
+  const fxBGets = env.fetchCalls.filter((c) => c.url === '/api/editor/effect/fx-b/viewer.js');
+  assert.equal(fxBGets.length, 2);
+});
+
+test('E5 staged 優先於 cache：staged 顯示、切回不重抓、cache 不被 staged 覆蓋', async () => {
+  const env = await loadEnv({
+    manifest: M3,
+    fileGetSeq: [
+      { status: 200, payload: 'A-v1' },
+      { status: 200, payload: 'B-v1' }
+    ]
+  });
+  const ed = env.window.__rtxEditor;
+  const els = env.els;
+  els.tabs.querySelectorAll('.tab').find((t) => t.getAttribute('data-tab') === 'viewer')._fire('click', {});
+  await settle(4);
+  assert.equal(els.code.value, 'A-v1');
+  assert.equal(ed.codeCache['fx-a/viewer.js'].content, 'A-v1');
+  assert.equal(ed.codeCache['fx-a/viewer.js'].rev, M3.rev);
+  els.code.value = 'A-EDITED';
+  ed.saveFile();
+  await settle(2);
+  ed.selectItem('fx-b');
+  await settle(4);
+  assert.equal(els.code.value, 'B-v1');
+  ed.selectItem('fx-a');
+  await settle(4);
+  assert.equal(els.code.value, 'A-EDITED', 'staged 優先於 cache');
+  const fxAGets = env.fetchCalls.filter((c) => c.url === '/api/editor/effect/fx-a/viewer.js');
+  assert.equal(fxAGets.length, 1, 'staged 切回不重抓');
+  assert.equal(ed.codeCache['fx-a/viewer.js'].content, 'A-v1', 'cache 保持 server 基準（未被 staged 覆蓋）');
+});
+
+test('E5 previewViewerSource guard：codeLoaded 對齊才回 textarea；stale／manifest tab 皆 null；staged 優先', async () => {
+  const env = await loadEnv({
+    manifest: M3,
+    fileGetSeq: [
+      { status: 200, payload: 'A-v1' },
+      { status: 200, payload: 'B-v1' }
+    ]
+  });
+  const ed = env.window.__rtxEditor;
+  const els = env.els;
+  assert.equal(ed.previewViewerSource('fx-a'), null, '未載入 code→null');
+  els.tabs.querySelectorAll('.tab').find((t) => t.getAttribute('data-tab') === 'viewer')._fire('click', {});
+  await settle(4);
+  assert.equal(ed.previewViewerSource('fx-a'), 'A-v1', 'codeLoaded=fx-a viewer→回 textarea');
+  ed.selectItem('fx-b');
+  await settle(4);
+  assert.equal(ed.previewViewerSource('fx-a'), null, 'codeLoaded=fx-b→fx-a stale→null');
+  assert.equal(ed.previewViewerSource('fx-b'), 'B-v1');
+  els.tabs.querySelectorAll('.tab').find((t) => t.getAttribute('data-tab') === 'manifest')._fire('click', {});
+  await settle(4);
+  assert.equal(ed.previewViewerSource('fx-b'), null, 'manifest tab→null');
+  // staged 優先（切回 fx-a 後 [存檔]）
+  els.tabs.querySelectorAll('.tab').find((t) => t.getAttribute('data-tab') === 'viewer')._fire('click', {});
+  await settle(4);
+  ed.selectItem('fx-a');
+  await settle(4);
+  assert.equal(els.code.value, 'A-v1', 'cache hit 顯示');
+  els.code.value = 'A-EDITED';
+  ed.saveFile();
+  await settle(2);
+  assert.equal(ed.previewViewerSource('fx-a'), 'A-EDITED', 'staged 優先於 textarea');
+});
+
+test('E5 previewViewerSource：viewer 空內容（200 空 body）→ null', async () => {
+  const env = await loadEnv({ manifest: M3, fileGet: { payload: '' } });
+  const ed = env.window.__rtxEditor;
+  const els = env.els;
+  els.tabs.querySelectorAll('.tab').find((t) => t.getAttribute('data-tab') === 'viewer')._fire('click', {});
+  await settle(4);
+  assert.equal(els.code.value, '');
+  assert.equal(ed.previewViewerSource('fx-a'), null, '空值不當作 source');
+});

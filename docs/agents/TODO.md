@@ -12,7 +12,7 @@
 
 - SSE 斷線期間特效遺失（規格：不重播）
 - 限頻為全域滑動視窗（未區分客戶端）
-- 前端（console/viewer/editor）已有 Playwright 瀏覽器 E2E（`tests/e2e/`，88 項，含 `editor.spec.js` 60 項；webServer stdout/stderr 重定向 gitignored `e2e-server.log`、測試輸出不混 server log；webServer 以 `RTX_EFFECTS_DIR` 指向 `pre-server-copy.mjs` 複製的隔離 `tmp/e2e-effects/`（僅 fixture 4 特效）、`globalTeardown` 清理，E2E 不碰正式 `effects/`）；console 另有 node vm 冒煙測試（`tests/test_console.mjs`，74 項），viewer 另有 node vm 冒煙測試（`tests/test_effects.mjs`，19 項），特效編輯器另有 node vm 測試（`tests/test_editor.mjs`，132 項）與 pytest API 測試（`tests/test_editor_api.py`，85 項），特效範例另有 node vm 冒煙測試（`tests/test_effect_examples.mjs`，16 項），正式 catalog 另有 node vm 驗證測試（`tests/test_effect_catalog.mjs`，2 項）
+- 前端（console/viewer/editor）已有 Playwright 瀏覽器 E2E（`tests/e2e/`，88 項，含 `editor.spec.js` 60 項；webServer stdout/stderr 重定向 gitignored `e2e-server.log`、測試輸出不混 server log；webServer 以 `RTX_EFFECTS_DIR` 指向 `pre-server-copy.mjs` 複製的隔離 `tmp/e2e-effects/`（僅 fixture 4 特效）、`globalTeardown` 清理，E2E 不碰正式 `effects/`）；console 另有 node vm 冒煙測試（`tests/test_console.mjs`，74 項），viewer 另有 node vm 冒煙測試（`tests/test_effects.mjs`，19 項），特效編輯器另有 node vm 測試（`tests/test_editor.mjs`，137 項）與 pytest API 測試（`tests/test_editor_api.py`，85 項），特效範例另有 node vm 冒煙測試（`tests/test_effect_examples.mjs`，16 項），正式 catalog 另有 node vm 驗證測試（`tests/test_effect_catalog.mjs`，2 項）
 
 ## 第一階段：建立可維護的執行基礎
 
@@ -127,4 +127,5 @@
 - [x] 前端記憶體治理 Phase 3（viewer＋server，S4）：manifest 每個特效加 `viewerRev`／`consoleRev`（插件檔 SHA-256）、主體與插件靜態資產 `no-store`→`no-cache`＋`ETag`、`If-None-Match` 未變回 304、viewer 以 `?v=viewerRev` per-effect cache-busting（2026-09-29）
 - [x] 前端記憶體治理 Phase 3（console，S4 剩餘）：console 插件改以 per-effect `consoleRev` 做 cache-busting（`?v=consoleRev`、缺時 fallback manifest rev），未變插件 ETag 304 重驗證（2026-09-29）
 - [x] 前端記憶體治理 Phase 1（editor，S1）：preview/console 插件 script 節點以 `data-rtx-effect`／`data-rtx-rev` 標記、注入前移除已完成舊節點（container-scoped prune、in-flight 保留）、cache-busting 改 per-effect `viewerRev`／`consoleRev`（缺時 fallback manifest rev）（2026-09-30）
-- [ ] 前端記憶體治理後續（依 `docs/temp/frontend-memory/FRONTEND_MEMORY_PLAN.md`）：Phase 2（S2＋S3）、Phase 3（S5 可觀測性）（2026-09-30）
+- [x] 前端記憶體治理 Phase 2（editor，E5）：code 預覽 rev-keyed cache（`codeCache`：同 id＋同 rev 切回由 cache 顯示免重抓、rev 變化重抓、staged 優先於 cache、模板路徑亦入 cache）＋`previewViewerSource` `codeLoaded` guard（僅 `state.codeLoaded` 為本 id 之 viewer.js 時才信任 viewer tab textarea，否則回 null 落回磁碟路徑）（2026-09-30）
+- [ ] 前端記憶體治理後續（依 `docs/temp/frontend-memory/FRONTEND_MEMORY_PLAN.md`）：Phase 2 剩餘（E2＝S2 preview fetch 文字＋`new Function`、E3＝S3 registry 收斂）、Phase 3（S5 可觀測性）（2026-09-30）
